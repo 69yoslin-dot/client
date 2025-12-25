@@ -1,155 +1,79 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
 clear
-
-# === CONFIGURACION DE SS.MADARAS ===
+# Datos de tu VPS AlexHost
 DOMAIN="dns.freezing.work.gd"
-ACTIVE_DNS="Desconectado"
-LOG_DIR="$HOME/.slipstream"
-LOG_FILE="$LOG_DIR/slip.log"
+ACTIVE_DNS="No conectado"
+LOG_FILE="$HOME/.slipstream/slip.log"
+mkdir -p "$HOME/.slipstream"
 
-mkdir -p "$LOG_DIR"
-
-# DNS PARA ETECSA (No tocar si es para Cuba)
-DATA_SERVERS=(
-"200.55.128.130:53"
-"200.55.128.140:53"
-"200.55.128.230:53"
-"200.55.128.250:53"
-)
-
-WIFI_SERVERS=(
-"181.225.231.120:53"
-"181.225.231.110:53"
-"181.225.233.40:53"
-"181.225.233.30:53"
-)
+# Servidores DNS ETECSA
+DATA_SERVERS=("200.55.128.130:53" "200.55.128.140:53" "200.55.128.230:53" "200.55.128.250:53")
+WIFI_SERVERS=("181.225.231.120:53" "181.225.231.110:53" "181.225.233.40:53" "181.225.233.30:53")
 
 detect_network() {
     iface=$(ip route get 8.8.8.8 2>/dev/null | awk '{print $5}')
     [[ "$iface" == wlan* ]] && echo "WIFI" || echo "DATA"
 }
 
-clean_slipstream() {
-    pkill -f slipstream-client 2>/dev/null
-    sleep 1
+# Aquí es donde el nombre cambia para coincidir con tu GitHub
+install_slipstream() {
+    clear
+    pkg install wget -y
+    # Reemplaza '69yoslin-dot' por tu usuario real si es diferente
+    wget https://raw.githubusercontent.com/69yoslin-dot/client/main/install-client.sh
+    chmod +x install-client.sh
+    ./install-client.sh
+    read -p "ENTER para volver al menú"
 }
 
-trap_ctrl_c() {
-    echo
-    echo "[!] Deteniendo servicios..."
-    clean_slipstream
-    ACTIVE_DNS="Desconectado"
-    read -p "Presiona ENTER para volver"
-    return
-}
-
-wait_for_menu() {
-    while true; do
-        echo
-        echo -n "Comando [menu]: "
-        read -r input </dev/tty
-        [[ -z "$input" ]] && continue
-        cmd=$(echo "$input" | tr '[:upper:]' '[:lower:]')
-
-        if [[ "$cmd" == "menu" ]]; then
-            clean_slipstream
-            ACTIVE_DNS="Desconectado"
-            return
-        fi
-    done
-}
+clean_slip() { pkill -f slipstream-client 2>/dev/null; sleep 1; }
 
 connect_auto() {
     local SERVERS=("$@")
-
     for SERVER in "${SERVERS[@]}"; do
-        clean_slipstream
-        > "$LOG_FILE"
+        clean_slip
         clear
-        echo "----------------------------------"
-        echo "  SS.MADARAS - CONECTANDO..."
-        echo "----------------------------------"
-        echo "[*] Servidor DNS: $SERVER"
-        echo "[*] Dominio: $DOMAIN"
-        echo
-
-        trap trap_ctrl_c INT
-
-        # Ejecución del cliente local
-        ./slipstream-client \
-            --tcp-listen-port=5201 \
-            --resolver="$SERVER" \
-            --domain="$DOMAIN" \
-            --keep-alive-interval=600 \
-            --congestion-control=cubic \
-            > >(tee -a "$LOG_FILE") 2>&1 &
-
-        # Esperar conexión (Timeout 7s)
+        echo "[*] SS.MADARAS Probando: $SERVER"
+        ./slipstream-client --tcp-listen-port=5201 --resolver="$SERVER" --domain="$DOMAIN" --keep-alive-interval=600 > "$LOG_FILE" 2>&1 &
+        
         for i in {1..7}; do
             if grep -q "Connection confirmed" "$LOG_FILE"; then
                 ACTIVE_DNS="$SERVER"
                 clear
-                echo "=================================="
-                echo "    CONEXIÓN ESTABLECIDA ✅"
-                echo "=================================="
-                echo " IP Local: 127.0.0.1"
-                echo " Puerto:   5201"
-                echo " DNS:      $ACTIVE_DNS"
-                echo "=================================="
-                echo " Ve a HTTP Custom y conecta ahora."
-                echo " Escribe 'menu' para desconectar."
-                echo
-
-                wait_for_menu
-                trap - INT
-                return
-            fi
-
-            if grep -q "Connection closed" "$LOG_FILE"; then
-                break
+                echo -e "=================================="
+                echo -e "    SS.MADARAS CONECTADO ✅"
+                echo -e "=================================="
+                echo -e "DNS: $ACTIVE_DNS"
+                echo -e "Usa 127.0.0.1:5201 en HTTP Custom"
+                echo -e "Escribe 'menu' para desconectar."
+                
+                while true; do
+                    read -p "> " cmd
+                    if [[ "$cmd" == "menu" ]]; then clean_slip; ACTIVE_DNS="No conectado"; return; fi
+                done
             fi
             sleep 1
         done
-
-        trap - INT
-        clean_slipstream
+        clean_slip
     done
-
-    echo "[!] Falló la conexión con los servidores disponibles."
-    read -p "ENTER para continuar"
+    read -p "Fallo en conexión. ENTER para volver."
 }
 
 while true; do
     clear
     NET=$(detect_network)
-    DATA_MARK="[ ]"
-    WIFI_MARK="[ ]"
-    [[ "$NET" == "DATA" ]] && DATA_MARK="[ON]"
-    [[ "$NET" == "WIFI" ]] && WIFI_MARK="[ON]"
-
-    echo " ______________________________ "
-    echo "|                              |"
-    echo "|      SS.MADARAS SYSTEM       |"
-    echo "|______________________________|"
-    echo "| User: SS.MADARAS             |"
-    echo "| Host: $DOMAIN |"
-    echo "|______________________________|"
-    echo
-    echo " Estado: $ACTIVE_DNS"
-    echo
-    echo " $DATA_MARK 1. Conexión Datos Móviles"
-    echo " $WIFI_MARK 2. Conexión WiFi"
-    echo "      0. Salir"
-    echo
-    echo " Telegram: https://t.me/ss_madaras"
-    echo "______________________________"
-    read -p " Elige opción: " opt
-
+    echo -e "SS.MADARAS VIP SYSTEM | Red: $NET"
+    echo -e "DNS: $ACTIVE_DNS\n"
+    echo "1) Conectar en Datos"
+    echo "2) Conectar en WiFi"
+    echo "3) Instalar/Reparar (install-client.sh)"
+    echo "0) Salir"
+    read -p "Opción: " opt
     case $opt in
         1) connect_auto "${DATA_SERVERS[@]}" ;;
         2) connect_auto "${WIFI_SERVERS[@]}" ;;
-        0) clean_slipstream; exit ;;
-        *) echo "Opción inválida"; sleep 1 ;;
+        3) install_slipstream ;;
+        0) exit ;;
     esac
 done
