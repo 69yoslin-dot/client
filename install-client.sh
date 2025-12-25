@@ -26,7 +26,7 @@ else
 fi
 
 ### ===============================
-### FUNCIONES UI (SS.MADARAS)
+### FUNCIONES UI
 ### ===============================
 msg() {
     if [ "$MODE" = "DIALOG" ]; then
@@ -55,7 +55,7 @@ confirm "¿Deseas continuar?"
 [ $? -ne 0 ] && clear && exit 1
 
 ### ===============================
-### CONFIGURAR REPOS
+### CONFIGURAR REPOS (LIMPIO)
 ### ===============================
 if [ "$MODE" = "DIALOG" ]; then
     dialog --infobox "Configurando repositorios...\n\nPor favor espera." 6 50
@@ -84,7 +84,6 @@ install_with_progress() {
     pkg install termux-tools dos2unix -y >/dev/null 2>&1
 
     echo 70
-    # Descarga del binario cliente original
     wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/quic_over_dns/main/slipstream-client
 
     echo 85
@@ -94,7 +93,7 @@ install_with_progress() {
 }
 
 if [ "$MODE" = "DIALOG" ]; then
-    install_with_progress | dialog --gauge "Instalando herramientas de SS.MADARAS..." 10 60 0
+    install_with_progress | dialog --gauge "Instalando herramientas SS.MADARAS..." 10 60 0
 else
     install_with_progress
 fi
@@ -110,7 +109,7 @@ final_message() {
             choice=$(dialog --clear --title "SS.MADARAS VIP" \
                 --menu "Instalación completada correctamente." 10 50 2 \
                 1 "SALIR" \
-                2 "SOPORTE VIP" 3>&1 1>&2 2>&3)
+                2 "SOPORTE TELEGRAM" 3>&1 1>&2 2>&3)
 
             case $choice in
                 1)
@@ -128,8 +127,9 @@ final_message() {
             esac
         done
     else
+        # Modo texto
         echo -e "\nInstalación completada correctamente.\n"
-        echo -e "Chat VIP: $TELEGRAM_CHAT"
+        echo -e "Soporte: $TELEGRAM_CHAT"
         echo -e "\nEscribe 'SALIR' para cerrar o 'VIP' para abrir el chat:"
         read r
         if [[ "$r" =~ ^[Vv][Ii][Pp]$ ]]; then
@@ -138,5 +138,6 @@ final_message() {
     fi
 }
 
+# Llamamos a la función final
 final_message
 clear
