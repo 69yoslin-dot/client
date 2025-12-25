@@ -4,6 +4,14 @@ clear
 export APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 
 ### ===============================
+### COMPROBAR TERMUX
+### ===============================
+if [ ! -d "/data/data/com.termux" ]; then
+    echo "[!] Este script solo funciona en Termux."
+    exit 1
+fi
+
+### ===============================
 ### COMPROBAR / INSTALAR DIALOG
 ### ===============================
 if ! command -v dialog >/dev/null 2>&1; then
@@ -11,35 +19,124 @@ if ! command -v dialog >/dev/null 2>&1; then
     pkg install dialog -y >/dev/null 2>&1
 fi
 
-MODE=$(command -v dialog >/dev/null 2>&1 && echo "DIALOG" || echo "TEXT")
-
-### ===============================
-### BIENVENIDA SS.MADARAS
-### ===============================
-if [ "$MODE" = "DIALOG" ]; then
-    dialog --msgbox "Bienvenido al instalador VIP de SS.MADARAS.\n\nSe configurará tu terminal para el túnel DNS." 10 55
+if command -v dialog >/dev/null 2>&1; then
+    MODE="DIALOG"
 else
-    echo -e "\nBienvenido al instalador VIP de SS.MADARAS.\n"
+    MODE="TEXT"
 fi
 
 ### ===============================
-### INSTALACIÓN
+### FUNCIONES UI (SS.MADARAS)
 ### ===============================
-install_logic() {
-    echo 20; pkg update -y >/dev/null 2>&1
-    echo 40; pkg upgrade -y >/dev/null 2>&1
-    echo 60; pkg install wget brotli openssl termux-tools dos2unix -y >/dev/null 2>&1
-    echo 80; wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/quic_over_dns/main/slipstream-client
-    echo 90; chmod +x slipstream-client
+msg() {
+    if [ "$MODE" = "DIALOG" ]; then
+        dialog --msgbox "$1" 10 55
+    else
+        echo -e "\n$1\n"
+    fi
+}
+
+confirm() {
+    if [ "$MODE" = "DIALOG" ]; then
+        dialog --yesno "$1" 8 45
+        return $?
+    else
+        read -p "$1 (y/n): " r
+        [[ "$r" =~ ^[Yy]$ ]]
+    fi
+}
+
+### ===============================
+### BIENVENIDA
+### ===============================
+msg "Bienvenido al instalador VIP de SS.MADARAS.\n\nSe instalarán todas las herramientas necesarias."
+
+confirm "¿Deseas continuar?"
+[ $? -ne 0 ] && clear && exit 1
+
+### ===============================
+### CONFIGURAR REPOS
+### ===============================
+if [ "$MODE" = "DIALOG" ]; then
+    dialog --infobox "Configurando repositorios...\n\nPor favor espera." 6 50
+    sleep 1
+    clear
+    termux-change-repo
+    clear
+else
+    termux-change-repo
+fi
+
+### ===============================
+### INSTALACIÓN CON PROGRESO REAL
+### ===============================
+install_with_progress() {
+    echo 10
+    pkg update -y >/dev/null 2>&1
+
+    echo 25
+    pkg upgrade -y >/dev/null 2>&1
+
+    echo 40
+    pkg install wget brotli openssl -y >/dev/null 2>&1
+
+    echo 55
+    pkg install termux-tools dos2unix -y >/dev/null 2>&1
+
+    echo 70
+    # Descarga del binario cliente original
+    wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/quic_over_dns/main/slipstream-client
+
+    echo 85
+    chmod +x slipstream-client
+
     echo 100
 }
 
 if [ "$MODE" = "DIALOG" ]; then
-    install_logic | dialog --gauge "Instalando herramientas SS.MADARAS..." 10 60 0
+    install_with_progress | dialog --gauge "Instalando herramientas de SS.MADARAS..." 10 60 0
 else
-    install_logic
+    install_with_progress
 fi
 
+### ===============================
+### FINAL CON BOTONES
+### ===============================
+final_message() {
+    local TELEGRAM_CHAT="https://t.me/ss_madaras"
+
+    if [ "$MODE" = "DIALOG" ]; then
+        while true; do
+            choice=$(dialog --clear --title "SS.MADARAS VIP" \
+                --menu "Instalación completada correctamente." 10 50 2 \
+                1 "SALIR" \
+                2 "SOPORTE VIP" 3>&1 1>&2 2>&3)
+
+            case $choice in
+                1)
+                    clear
+                    break
+                    ;;
+                2)
+                    clear
+                    am start -a android.intent.action.VIEW -d "$TELEGRAM_CHAT"
+                    break
+                    ;;
+                *)
+                    break
+                    ;;
+            esac
+        done
+    else
+        echo -e "\nInstalación completada correctamente.\n"
+        echo -e "Chat VIP: $TELEGRAM_CHAT"
+        echo -e "\nEscribe 'SALIR' para cerrar o 'VIP' para abrir el chat:"
+        read r
+        if [[ "$r" =~ ^[Vv][Ii][Pp]$ ]]; then
+            am start -a android.intent.action.VIEW -d "$TELEGRAM_CHAT"
+        fi
+    fi
+}
+
+final_message
 clear
-echo -e "Instalación completada correctamente."
-echo -e "Soporte Telegram: https://t.me/ss_madaras"
