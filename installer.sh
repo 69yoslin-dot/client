@@ -1,138 +1,145 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
 clear
-export APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 
-### ===============================
-### COMPROBAR TERMUX
-### ===============================
-if [ ! -d "/data/data/com.termux" ]; then
-    echo "[!] Este script solo funciona en Termux."
-    exit 1
-fi
+# Configuración de SS.MADARAS
+DOMAIN="dns.freezing.work.gd"
+ACTIVE_DNS="No conectado"
+LOG_DIR="$HOME/.slipstream"
+LOG_FILE="$LOG_DIR/slip.log"
 
-### ===============================
-### COMPROBAR / INSTALAR DIALOG
-### ===============================
-if ! command -v dialog >/dev/null 2>&1; then
-    pkg update -y >/dev/null 2>&1
-    pkg install dialog -y >/dev/null 2>&1
-fi
+mkdir -p "$LOG_DIR"
 
-if command -v dialog >/dev/null 2>&1; then
-    MODE="DIALOG"
-else
-    MODE="TEXT"
-fi
+DATA_SERVERS=(
+"200.55.128.130:53"
+"200.55.128.140:53"
+"200.55.128.230:53"
+"200.55.128.250:53"
+)
 
-### ===============================
-### FUNCIONES UI
-### ===============================
-msg() {
-    if [ "$MODE" = "DIALOG" ]; then
-        dialog --msgbox "$1" 10 55
-    else
-        echo -e "\n$1\n"
-    fi
+WIFI_SERVERS=(
+"181.225.231.120:53"
+"181.225.231.110:53"
+"181.225.233.40:53"
+"181.225.233.30:53"
+)
+
+detect_network() {
+    iface=$(ip route get 8.8.8.8 2>/dev/null | awk '{print $5}')
+    [[ "$iface" == wlan* ]] && echo "WIFI" || echo "DATA"
 }
 
-confirm() {
-    if [ "$MODE" = "DIALOG" ]; then
-        dialog --yesno "$1" 8 45
-        return $?
-    else
-        read -p "$1 (y/n): " r
-        [[ "$r" =~ ^[Yy]$ ]]
-    fi
+install_slipstream() {
+    clear
+    pkg update -y && pkg upgrade -y && pkg install wget -y
+    # CAMBIA ESTE LINK POR EL DE TU REPO CUANDO SUBAS EL SETUP.SH
+    wget https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/main/setup.sh
+    chmod +x setup.sh
+    ./setup.sh
+    read -p "ENTER para volver al menú"
 }
 
-### ===============================
-### BIENVENIDA SS.MADARAS
-### ===============================
-msg "Bienvenido al instalador de SS.MADARAS.\n\nSe configurará tu entorno Termux."
-
-confirm "¿Deseas continuar con la instalación?"
-[ $? -ne 0 ] && clear && exit 1
-
-### ===============================
-### CONFIGURAR REPOS
-### ===============================
-if [ "$MODE" = "DIALOG" ]; then
-    dialog --infobox "Optimizando repositorios...\n\nPor favor espera." 6 50
+clean_slipstream() {
+    pkill -f slipstream-client 2>/dev/null
     sleep 1
-    termux-change-repo
-else
-    termux-change-repo
-fi
-
-### ===============================
-### INSTALACIÓN
-### ===============================
-install_with_progress() {
-    echo 10
-    pkg update -y >/dev/null 2>&1
-
-    echo 25
-    pkg upgrade -y >/dev/null 2>&1
-
-    echo 40
-    pkg install wget brotli openssl termux-tools dos2unix -y >/dev/null 2>&1
-
-    echo 60
-    # AQUI DEBES PONER EL LINK RAW DE TU GITHUB DONDE SUBAS EL CLIENTE
-    # Ejemplo: https://raw.githubusercontent.com/TuUsuario/TuRepo/main/slipstream-client
-    wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/quic_over_dns/main/slipstream-client -O slipstream-client
-    
-    # Descargar el script del menú (asumiendo que lo subiste como menu.sh)
-    # wget -q https://raw.githubusercontent.com/TU_USUARIO/TU_REPO/main/menu.sh -O menu.sh
-
-    echo 85
-    chmod +x slipstream-client
-    # chmod +x menu.sh
-
-    echo 100
 }
 
-if [ "$MODE" = "DIALOG" ]; then
-    install_with_progress | dialog --gauge "Instalando recursos SS.MADARAS..." 10 60 0
-else
-    install_with_progress
-fi
+trap_ctrl_c() {
+    echo
+    echo "[!] Conexión interrumpida por SS.MADARAS"
+    clean_slipstream
+    ACTIVE_DNS="No conectado"
+    read -p "ENTER para volver al menú"
+    return
+}
 
-### ===============================
-### FINAL
-### ===============================
-final_message() {
-    local TELEGRAM_CHAT="https://t.me/ss_madaras"
+wait_for_menu() {
+    while true; do
+        echo
+        echo -n "> "
+        read -r input </dev/tty
+        [[ -z "$input" ]] && continue
+        cmd=$(echo "$input" | tr '[:upper:]' '[:lower:]')
 
-    if [ "$MODE" = "DIALOG" ]; then
-        while true; do
-            choice=$(dialog --clear --title "SS.MADARAS VIP" \
-                --menu "Instalación completada." 10 50 2 \
-                1 "INICIAR MENU" \
-                2 "SOPORTE TELEGRAM" 3>&1 1>&2 2>&3)
+        if [[ "$cmd" == "menu" ]]; then
+            clean_slipstream
+            ACTIVE_DNS="No conectado"
+            return
+        else
+            echo "[X] Comando no reconocido. Use: menu"
+        fi
+    done
+}
 
-            case $choice in
-                1)
-                    clear
-                    # ./menu.sh  <-- Descomenta esto cuando subas tu menu
-                    break
-                    ;;
-                2)
-                    clear
-                    am start -a android.intent.action.VIEW -d "$TELEGRAM_CHAT"
-                    break
-                    ;;
-                *)
-                    break
-                    ;;
-            esac
+connect_auto() {
+    local SERVERS=("$@")
+
+    for SERVER in "${SERVERS[@]}"; do
+        clean_slipstream
+        > "$LOG_FILE"
+
+        clear
+        echo "[*] SS.MADARAS Probando: $SERVER"
+        echo
+
+        trap trap_ctrl_c INT
+
+        ./slipstream-client \
+            --tcp-listen-port=5201 \
+            --resolver="$SERVER" \
+            --domain="$DOMAIN" \
+            --keep-alive-interval=600 \
+            --congestion-control=cubic \
+            > >(tee -a "$LOG_FILE") 2>&1 &
+
+        # Espera de confirmación
+        for i in {1..7}; do
+            if grep -q "Connection confirmed" "$LOG_FILE"; then
+                ACTIVE_DNS="$SERVER"
+                clear
+                echo "[✓] SS.MADARAS: CONEXIÓN CONFIRMADA"
+                echo "[✓] DNS Activo: $ACTIVE_DNS"
+                echo
+                echo "Ctrl + C para desconectar"
+                echo 'Escriba "menu" para volver al menú'
+                echo
+
+                wait_for_menu
+                trap - INT
+                return
+            fi
+            sleep 1
         done
-    else
-        echo -e "\nInstalación completada.\n"
-        echo -e "Telegram: $TELEGRAM_CHAT"
-    fi
+        clean_slipstream
+    done
+
+    echo "[X] No se pudo conectar. Revisa tu VPS."
+    read -p "ENTER para volver al menú"
 }
 
-final_message
-clear
+while true; do
+    clear
+    NET=$(detect_network)
+    DATA_MARK="○"
+    WIFI_MARK="○"
+    [[ "$NET" == "DATA" ]] && DATA_MARK="●"
+    [[ "$NET" == "WIFI" ]] && WIFI_MARK="●"
+
+    echo "  SS.MADARAS DNS SYSTEM  "
+    echo "-------------------------"
+    echo " DNS Activo: $ACTIVE_DNS"
+    echo
+    echo "$DATA_MARK 1) Conectar Datos"
+    echo "$WIFI_MARK 2) Conectar WiFi"
+    echo "  3) Reinstalar Sistema"
+    echo "  0) Salir"
+    echo
+    read -p "Selecciona: " opt
+
+    case $opt in
+        1) connect_auto "${DATA_SERVERS[@]}" ;;
+        2) connect_auto "${WIFI_SERVERS[@]}" ;;
+        3) install_slipstream ;;
+        0) clear; exit ;;
+    esac
+done
