@@ -49,95 +49,63 @@ confirm() {
 ### ===============================
 ### BIENVENIDA
 ### ===============================
-msg "Bienvenido al instalador VIP de SS.MADARAS.\n\nSe instalarán todas las herramientas necesarias."
+msg "Bienvenido al instalador VIP de SS.MADARAS.\n\nSe instalarán todas las herramientas necesarias para la conexión DNS."
 
 confirm "¿Deseas continuar?"
 [ $? -ne 0 ] && clear && exit 1
 
 ### ===============================
-### CONFIGURAR REPOS (LIMPIO)
+### CONFIGURAR REPOS
 ### ===============================
 if [ "$MODE" = "DIALOG" ]; then
-    dialog --infobox "Configurando repositorios...\n\nPor favor espera." 6 50
-    sleep 1
-    clear
-    termux-change-repo
-    clear
+    dialog --infobox "Configurando repositorios y actualizando...\n\nPor favor espera." 6 50
+    pkg update -y >/dev/null 2>&1
 else
-    termux-change-repo
+    pkg update -y
 fi
 
 ### ===============================
-### INSTALACIÓN CON PROGRESO REAL
+### INSTALACIÓN CON PROGRESO
 ### ===============================
 install_with_progress() {
-    echo 10
-    pkg update -y >/dev/null 2>&1
-
-    echo 25
+    echo 20
     pkg upgrade -y >/dev/null 2>&1
 
     echo 40
-    pkg install wget brotli openssl -y >/dev/null 2>&1
-
-    echo 55
-    pkg install termux-tools dos2unix -y >/dev/null 2>&1
+    pkg install wget brotli openssl termux-tools dos2unix -y >/dev/null 2>&1
 
     echo 70
-    wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/quic_over_dns/main/slipstream-client
+    # Descarga directa del cliente corregido
+    wget -q -O slipstream-client https://raw.githubusercontent.com/Mahboub-power-is-back/quic_over_dns/main/slipstream-client
 
-    echo 85
+    echo 90
     chmod +x slipstream-client
-
+    
     echo 100
 }
 
 if [ "$MODE" = "DIALOG" ]; then
-    install_with_progress | dialog --gauge "Instalando herramientas SS.MADARAS..." 10 60 0
+    install_with_progress | dialog --gauge "Instalando herramientas SS.MADARAS VIP..." 10 60 0
 else
     install_with_progress
 fi
 
 ### ===============================
-### FINAL CON BOTONES
+### FINALIZACIÓN
 ### ===============================
 final_message() {
     local TELEGRAM_CHAT="https://t.me/ss_madaras"
-
     if [ "$MODE" = "DIALOG" ]; then
-        while true; do
-            choice=$(dialog --clear --title "SS.MADARAS VIP" \
-                --menu "Instalación completada correctamente." 10 50 2 \
-                1 "SALIR" \
-                2 "SOPORTE TELEGRAM" 3>&1 1>&2 2>&3)
-
-            case $choice in
-                1)
-                    clear
-                    break
-                    ;;
-                2)
-                    clear
-                    am start -a android.intent.action.VIEW -d "$TELEGRAM_CHAT"
-                    break
-                    ;;
-                *)
-                    break
-                    ;;
-            esac
-        done
+        choice=$(dialog --clear --title "SS.MADARAS VIP" \
+            --menu "Instalación completada.\n\nDominio: dns.freezing.work.gd\nPuerto local: 5201" 12 50 2 \
+            1 "FINALIZAR" \
+            2 "SOPORTE TELEGRAM" 3>&1 1>&2 2>&3)
+        [[ "$choice" == "2" ]] && am start -a android.intent.action.VIEW -d "$TELEGRAM_CHAT"
     else
-        # Modo texto
-        echo -e "\nInstalación completada correctamente.\n"
-        echo -e "Soporte: $TELEGRAM_CHAT"
-        echo -e "\nEscribe 'SALIR' para cerrar o 'VIP' para abrir el chat:"
-        read r
-        if [[ "$r" =~ ^[Vv][Ii][Pp]$ ]]; then
-            am start -a android.intent.action.VIEW -d "$TELEGRAM_CHAT"
-        fi
+        echo -e "\nInstalación completa. Dominio configurado: dns.freezing.work.gd"
     fi
 }
 
-# Llamamos a la función final
 final_message
 clear
+
