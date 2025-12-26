@@ -31,7 +31,7 @@ pkg update -y && pkg upgrade -y
 pkg install wget curl procps libandroid-posix-semaphore libuuid -y > /dev/null 2>&1
 
 # 3. Descargar Cliente (Motor Binario)
-# Este es el link directo a tu motor en AlexHost
+# Este es el link directo a tu motor
 CLIENT_URL="https://github.com/69yoslin-dot/client/raw/main/slipstream-client-android"
 CLIENT_BIN="slipstream-client"
 
@@ -45,7 +45,7 @@ else
     exit 1
 fi
 
-# 4. Descargar Menú Ético (El que no miente)
+# 4. Descargar Menú Ético
 MENU_URL="https://github.com/69yoslin-dot/client/raw/main/menu.sh"
 echo -e "${Y}[*] Configurando panel de control...${NC}"
 wget -O menu.sh $MENU_URL -q
