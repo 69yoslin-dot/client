@@ -42,6 +42,7 @@ clean_slipstream() {
     sleep 1
 }
 
+# Manejo limpio de Ctrl + C
 trap_ctrl_c() {
     echo
     echo "[!] Conexión interrumpida"
@@ -56,8 +57,12 @@ wait_for_menu() {
         echo
         echo -n "> "
         read -r input </dev/tty
+
+        # Ignorar vacío
         [[ -z "$input" ]] && continue
+
         cmd=$(echo "$input" | tr '[:upper:]' '[:lower:]')
+
         if [[ "$cmd" == "menu" ]]; then
             clean_slipstream
             ACTIVE_DNS="No conectado"
@@ -81,7 +86,7 @@ connect_auto() {
 
         trap trap_ctrl_c INT
 
-        # Ejecución silenciando errores de Netlink/Socket para evitar ruido
+        # Lanzamos el cliente redirigiendo la salida al archivo de log
         ./slipstream-client \
             --tcp-listen-port=5201 \
             --resolver="$SERVER" \
@@ -90,30 +95,26 @@ connect_auto() {
             --congestion-control=cubic \
             > >(tee -a "$LOG_FILE") 2>&1 &
 
-        # Verificación inteligente (Doble validación)
-        for i in {1..12}; do
-            # 1. Comprobamos si el binario confirmó la conexión en el LOG
-            # 2. Comprobamos si el puerto 5201 está realmente abierto y escuchando
+        PID=$!
+
+        # Espera máxima: 10 segundos (ajustado para mayor estabilidad)
+        for i in {1..10}; do
+            # Verificación por frase o por puerto (Doble seguridad)
             if grep -q "Connection confirmed" "$LOG_FILE" || ss -tpln | grep -q ":5201"; then
                 ACTIVE_DNS="$SERVER"
                 clear
-                echo "████████████████████████████████"
-                echo "      CONEXIÓN CONFIRMADA"
-                echo "████████████████████████████████"
+                echo "[✓] CONEXIÓN CONFIRMADA"
                 echo "[✓] DNS Activo: $ACTIVE_DNS"
-                echo "------------------------------------------------"
-                echo "1. Ve a tu App SSH (HTTP Custom/Injector/etc)"
-                echo "2. Configura Host: 127.0.0.1 y Puerto: 5201"
-                echo "------------------------------------------------"
+                echo
                 echo "Ctrl + C para desconectar"
                 echo 'Escriba "menu" para volver al menú'
-                
+                echo
+
                 wait_for_menu
                 trap - INT
                 return
             fi
 
-            # Si el log dice que se cerró, saltamos al siguiente DNS de inmediato
             if grep -q "Connection closed" "$LOG_FILE"; then
                 break
             fi
@@ -130,6 +131,7 @@ connect_auto() {
 
 while true; do
     clear
+
     NET=$(detect_network)
     DATA_MARK="○"
     WIFI_MARK="○"
