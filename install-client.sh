@@ -42,7 +42,6 @@ clean_slipstream() {
     sleep 1
 }
 
-# Manejo limpio de Ctrl + C
 trap_ctrl_c() {
     echo
     echo "[!] Conexión interrumpida"
@@ -57,12 +56,8 @@ wait_for_menu() {
         echo
         echo -n "> "
         read -r input </dev/tty
-
-        # Ignorar vacío
         [[ -z "$input" ]] && continue
-
         cmd=$(echo "$input" | tr '[:upper:]' '[:lower:]')
-
         if [[ "$cmd" == "menu" ]]; then
             clean_slipstream
             ACTIVE_DNS="No conectado"
@@ -86,6 +81,7 @@ connect_auto() {
 
         trap trap_ctrl_c INT
 
+        # Ejecución del cliente
         ./slipstream-client \
             --tcp-listen-port=5201 \
             --resolver="$SERVER" \
@@ -94,27 +90,24 @@ connect_auto() {
             --congestion-control=cubic \
             > >(tee -a "$LOG_FILE") 2>&1 &
 
-        PID=$!
-
-        # Espera máxima: 7 segundos
-        for i in {1..7}; do
-            if grep -q "Connection confirmed" "$LOG_FILE"; then
+        # CAMBIO AQUÍ: En lugar de buscar una frase, verificamos si el puerto 5201 se abrió
+        # Esto es mucho más fiable para tu versión de servidor.
+        for i in {1..10}; do
+            if ss -tpln | grep -q ":5201"; then
                 ACTIVE_DNS="$SERVER"
                 clear
                 echo "[✓] CONEXIÓN CONFIRMADA"
                 echo "[✓] DNS Activo: $ACTIVE_DNS"
-                echo
+                echo "------------------------------------------------"
+                echo "1. Ve a tu App SSH (HTTP Custom/Injector/etc)"
+                echo "2. Configura Host: 127.0.0.1 y Puerto: 5201"
+                echo "------------------------------------------------"
                 echo "Ctrl + C para desconectar"
                 echo 'Escriba "menu" para volver al menú'
-                echo
-
+                
                 wait_for_menu
                 trap - INT
                 return
-            fi
-
-            if grep -q "Connection closed" "$LOG_FILE"; then
-                break
             fi
             sleep 1
         done
@@ -129,7 +122,6 @@ connect_auto() {
 
 while true; do
     clear
-
     NET=$(detect_network)
     DATA_MARK="○"
     WIFI_MARK="○"
