@@ -1,89 +1,143 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# --- CONFIGURACIÓN MAESTRA ---
-DOMAIN="freezing-dns.duckdns.org"
-LOCAL_PORT="5201"
-# -----------------------------
+clear
+export APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 
-LOG_FILE="$HOME/.slipstream_log"
-trap "pkill -f slipstream-client; exit" SIGINT SIGTERM
+### ===============================
+### COMPROBAR TERMUX
+### ===============================
+if [ ! -d "/data/data/com.termux" ]; then
+    echo "[!] Este script solo funciona en Termux."
+    exit 1
+fi
 
-# Servidores DNS (ETECSA)
-DATA_SERVERS=("200.55.128.130:53" "200.55.128.140:53" "200.55.128.3:53" "200.55.128.4:53")
-WIFI_SERVERS=("181.225.231.120:53" "181.225.231.110:53" "181.225.233.40:53")
+### ===============================
+### COMPROBAR / INSTALAR DIALOG
+### ===============================
+if ! command -v dialog >/dev/null 2>&1; then
+    pkg update -y >/dev/null 2>&1
+    pkg install dialog -y >/dev/null 2>&1
+fi
 
-start_tunnel() {
-    local DNS_IP="$1"
-    pkill -f slipstream-client
-    
-    echo -e "\e[1;33m[*] Conectando a través de: $DNS_IP ...\e[0m"
-    
-    # Ejecución en segundo plano
-    ./slipstream-client \
-        --tcp-listen-port=$LOCAL_PORT \
-        --resolver="$DNS_IP" \
-        --domain="$DOMAIN" \
-        --keep-alive-interval=20 \
-        > "$LOG_FILE" 2>&1 &
-        
-    PID=$!
-    
-    # Barra de carga visual
-    echo -ne "\e[1;36m[Espere] \e[0m"
-    for i in {1..5}; do echo -ne "▓"; sleep 1; done
-    echo ""
+if command -v dialog >/dev/null 2>&1; then
+    MODE="DIALOG"
+else
+    MODE="TEXT"
+fi
 
-    # Verificar si el proceso sigue corriendo
-    if ps -p $PID > /dev/null; then
-        clear
-        echo -e "\e[1;32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
-        echo -e "\e[1;37m        CONEXIÓN ESTABLECIDA            \e[0m"
-        echo -e "\e[1;32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
-        echo -e " \e[1;34m»\e[0m Estado: \e[1;32mONLINE\e[0m"
-        echo -e " \e[1;34m»\e[0m DNS:    \e[1;37m$DNS_IP\e[0m"
-        echo -e " \e[1;34m»\e[0m Server: \e[1;37m$DOMAIN\e[0m"
-        echo -e "\e[1;32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
-        echo -e "\e[1;33m[!] Configura tu HTTP Custom / Injector:\e[0m"
-        echo -e "    IP: 127.0.0.1"
-        echo -e "    Puerto: $LOCAL_PORT"
-        echo -e "\e[1;32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
-        echo -e "\e[1;30mPresiona ENTER para desconectar y salir...\e[0m"
-        read temp
-        pkill -f slipstream-client
+### ===============================
+### FUNCIONES UI
+### ===============================
+msg() {
+    if [ "$MODE" = "DIALOG" ]; then
+        dialog --msgbox "$1" 10 55
     else
-        echo -e "\e[1;31m[!] Falló la conexión con este DNS. Intentando otro...\e[0m"
-        sleep 1
+        echo -e "\n$1\n"
     fi
 }
 
-menu() {
-    while true; do
-        clear
-        echo -e "\e[1;36m   SS.MADARAS | $DOMAIN \e[0m"
-        echo -e "\e[1;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
-        echo -e "  \e[1;37m[1]\e[0m Conectar Datos Móviles (Auto)"
-        echo -e "  \e[1;37m[2]\e[0m Conectar WiFi / Nauta (Auto)"
-        echo -e "  \e[1;37m[0]\e[0m Salir"
-        echo -e "\e[1;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
-        read -p "Elige una opción: " opt
-
-        case $opt in
-            1) 
-                for server in "${DATA_SERVERS[@]}"; do
-                    start_tunnel "$server"
-                    # Si el túnel se conecta, el script se pausa en start_tunnel
-                    # Si falla, el loop continúa al siguiente DNS
-                done
-                ;;
-            2)
-                for server in "${WIFI_SERVERS[@]}"; do
-                    start_tunnel "$server"
-                done
-                ;;
-            0) exit 0 ;;
-            *) echo "Opción inválida"; sleep 1 ;;
-        esac
-    done
+confirm() {
+    if [ "$MODE" = "DIALOG" ]; then
+        dialog --yesno "$1" 8 45
+        return $?
+    else
+        read -p "$1 (y/n): " r
+        [[ "$r" =~ ^[Yy]$ ]]
+    fi
 }
 
-menu
+### ===============================
+### BIENVENIDA
+### ===============================
+msg "Bienvenido al instalador VIP de SS.MADARAS.\n\nSe instalarán todas las herramientas necesarias."
+
+confirm "¿Deseas continuar?"
+[ $? -ne 0 ] && clear && exit 1
+
+### ===============================
+### CONFIGURAR REPOS (LIMPIO)
+### ===============================
+if [ "$MODE" = "DIALOG" ]; then
+    dialog --infobox "Configurando repositorios...\n\nPor favor espera." 6 50
+    sleep 1
+    clear
+    termux-change-repo
+    clear
+else
+    termux-change-repo
+fi
+
+### ===============================
+### INSTALACIÓN CON PROGRESO REAL
+### ===============================
+install_with_progress() {
+    echo 10
+    pkg update -y >/dev/null 2>&1
+
+    echo 25
+    pkg upgrade -y >/dev/null 2>&1
+
+    echo 40
+    pkg install wget brotli openssl -y >/dev/null 2>&1
+
+    echo 55
+    pkg install termux-tools dos2unix -y >/dev/null 2>&1
+
+    echo 70
+    wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/quic_over_dns/main/slipstream-client
+
+    echo 85
+    chmod +x slipstream-client
+
+    echo 100
+}
+
+if [ "$MODE" = "DIALOG" ]; then
+    install_with_progress | dialog --gauge "Instalando herramientas..." 10 60 0
+else
+    install_with_progress
+fi
+
+### ===============================
+### FINAL CON BOTONES
+### ===============================
+final_message() {
+    local TELEGRAM_CHAT="https://t.me/ss_madaras"
+
+    if [ "$MODE" = "DIALOG" ]; then
+        while true; do
+            choice=$(dialog --clear --title "VIP" \
+                --menu "Instalación completada correctamente." 10 50 2 \
+                1 "SALIR" \
+                2 "CONTRATAR VIP" 3>&1 1>&2 2>&3)
+
+            case $choice in
+                1)
+                    clear
+                    break
+                    ;;
+                2)
+                    clear
+                    am start -a android.intent.action.VIEW -d "$TELEGRAM_CHAT"
+                    break
+                    ;;
+                *)
+                    break
+                    ;;
+            esac
+        done
+    else
+        # Modo texto
+        echo -e "\nInstalación completada correctamente.\n"
+        echo -e "Chat VIP: $TELEGRAM_CHAT"
+        echo -e "\nEscribe 'SALIR' para cerrar o 'VIP' para abrir el chat:"
+        read r
+        if [[ "$r" =~ ^[Vv][Ii][Pp]$ ]]; then
+            am start -a android.intent.action.VIEW -d "$TELEGRAM_CHAT"
+        fi
+    fi
+}
+
+# Llamamos a la función final
+final_message
+clear
