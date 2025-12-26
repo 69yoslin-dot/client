@@ -1,90 +1,43 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# Nombre del archivo: setup.sh
 
-# --- CONFIGURACIÓN MAESTRA ---
-DOMAIN="freezing-dns.duckdns.org"
-LOCAL_PORT="5201"
-# -----------------------------
+# --- ENLACE AL SETUP EN TU REPO ---
+URL_SETUP="https://raw.githubusercontent.com/69yoslin-dot/client/main/setup.sh"
+# ----------------------------------
 
-LOG_FILE="$HOME/.slipstream_log"
-trap "pkill -f slipstream-client; exit" SIGINT SIGTERM
+clear
+echo -e "\e[1;36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
+echo -e "\e[1;33m       INSTALADOR SS.MADARAS VIP        \e[0m"
+echo -e "\e[1;36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
+echo ""
 
-# Servidores DNS (ETECSA / Cuba)
-DATA_SERVERS=("200.55.128.130:53" "200.55.128.140:53" "200.55.128.3:53" "200.55.128.4:53")
-WIFI_SERVERS=("181.225.231.120:53" "181.225.231.110:53" "181.225.233.40:53")
+# 1. Verificar entorno
+if [ ! -d "/data/data/com.termux" ]; then
+    echo -e "\e[1;31m[!] Error: Este script es solo para Termux.\e[0m"
+    exit 1
+fi
 
-start_tunnel() {
-    local DNS_IP="$1"
-    pkill -f slipstream-client
-    
-    echo -e "\e[1;33m[*] Conectando a través de: $DNS_IP ...\e[0m"
-    
-    # Ejecución oculta
-    ./slipstream-client \
-        --tcp-listen-port=$LOCAL_PORT \
-        --resolver="$DNS_IP" \
-        --domain="$DOMAIN" \
-        --keep-alive-interval=20 \
-        > "$LOG_FILE" 2>&1 &
-        
-    PID=$!
-    
-    # Barra de carga falsa para dar tiempo a la conexión
-    echo -ne "\e[1;36m[Espere] \e[0m"
-    for i in {1..5}; do echo -ne "▓"; sleep 1; done
-    echo ""
+# 2. Instalar dependencias
+echo -e "\e[1;32m[*] Instalando dependencias necesarias...\e[0m"
+pkg update -y > /dev/null 2>&1
+pkg install wget brotli openssl openssl-tool termux-tools iproute2 -y > /dev/null 2>&1
 
-    # Verificación simple (Revisa si el proceso sigue vivo)
-    if ps -p $PID > /dev/null; then
-        clear
-        echo -e "\e[1;32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
-        echo -e "\e[1;37m        CONEXIÓN ESTABLECIDA            \e[0m"
-        echo -e "\e[1;32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
-        echo -e " \e[1;34m»\e[0m Estado: \e[1;32mONLINE\e[0m"
-        echo -e " \e[1;34m»\e[0m DNS:    \e[1;37m$DNS_IP\e[0m"
-        echo -e " \e[1;34m»\e[0m Server: \e[1;37m$DOMAIN\e[0m"
-        echo -e "\e[1;32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
-        echo -e "\e[1;33m[!] Configura tu HTTP Custom / Injector:\e[0m"
-        echo -e "    IP: 127.0.0.1"
-        echo -e "    Puerto: $LOCAL_PORT"
-        echo -e "\e[1;32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
-        echo -e "\e[1;30mPresiona ENTER para desconectar y salir...\e[0m"
-        read temp
-        pkill -f slipstream-client
-    else
-        echo -e "\e[1;31m[!] Falló la conexión con este DNS.\e[0m"
-        sleep 2
-    fi
-}
+# 3. Descargar Cliente Binario
+echo -e "\e[1;32m[*] Descargando núcleo del sistema...\e[0m"
+wget -q -O slipstream-client https://raw.githubusercontent.com/Mahboub-power-is-back/quic_over_dns/main/slipstream-client
+chmod +x slipstream-client
 
-menu() {
-    while true; do
-        clear
-        echo -e "\e[1;36m   SS.MADARAS | $DOMAIN \e[0m"
-        echo -e "\e[1;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
-        echo -e "  \e[1;37m[1]\e[0m Conectar Datos Móviles (Auto)"
-        echo -e "  \e[1;37m[2]\e[0m Conectar WiFi / Nauta (Auto)"
-        echo -e "  \e[1;37m[0]\e[0m Salir"
-        echo -e "\e[1;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
-        read -p "Elige una opción: " opt
+# 4. Descargar el Menú de Conexión (Tu script)
+echo -e "\e[1;32m[*] Configurando menú de acceso...\e[0m"
+wget -q -O setup.sh "$URL_SETUP" 
+chmod +x setup.sh
 
-        case $opt in
-            1) 
-                for server in "${DATA_SERVERS[@]}"; do
-                    start_tunnel "$server"
-                    break # Quita este break si quieres que pruebe el siguiente si falla
-                done
-                ;;
-            2)
-                for server in "${WIFI_SERVERS[@]}"; do
-                    start_tunnel "$server"
-                    break
-                done
-                ;;
-            0) exit 0 ;;
-            *) echo "Opción inválida"; sleep 1 ;;
-        esac
-    done
-}
+# 5. Crear acceso directo simple
+echo "bash setup.sh" > start
+chmod +x start
 
-menu
+echo ""
+echo -e "\e[1;36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
+echo -e "\e[1;32m      ¡INSTALACIÓN COMPLETADA!          \e[0m"
+echo -e "\e[1;36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
+echo -e "\e[1;37mPara iniciar, escribe:\e[0m \e[1;33m./start\e[0m"
+echo ""
