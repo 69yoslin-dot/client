@@ -2,7 +2,6 @@
 
 clear
 
-# Configuración basada en tus capturas
 DOMAIN="freezing-dns.duckdns.org"
 ACTIVE_DNS="No conectado"
 LOG_DIR="$HOME/.slipstream"
@@ -10,7 +9,6 @@ LOG_FILE="$LOG_DIR/slip.log"
 
 mkdir -p "$LOG_DIR"
 
-# Servidores DNS para Datos y WiFi
 DATA_SERVERS=(
 "200.55.128.130:53"
 "200.55.128.140:53"
@@ -44,6 +42,7 @@ clean_slipstream() {
     sleep 1
 }
 
+# Manejo limpio de Ctrl + C
 trap_ctrl_c() {
     echo
     echo "[!] Conexión interrumpida"
@@ -58,8 +57,12 @@ wait_for_menu() {
         echo
         echo -n "> "
         read -r input </dev/tty
+
+        # Ignorar vacío
         [[ -z "$input" ]] && continue
+
         cmd=$(echo "$input" | tr '[:upper:]' '[:lower:]')
+
         if [[ "$cmd" == "menu" ]]; then
             clean_slipstream
             ACTIVE_DNS="No conectado"
@@ -72,15 +75,17 @@ wait_for_menu() {
 
 connect_auto() {
     local SERVERS=("$@")
+
     for SERVER in "${SERVERS[@]}"; do
         clean_slipstream
         > "$LOG_FILE"
+
         clear
         echo "[*] Probando servidor: $SERVER"
         echo
+
         trap trap_ctrl_c INT
 
-        # Ejecución del cliente
         ./slipstream-client \
             --tcp-listen-port=5201 \
             --resolver="$SERVER" \
@@ -90,6 +95,8 @@ connect_auto() {
             > >(tee -a "$LOG_FILE") 2>&1 &
 
         PID=$!
+
+        # Espera máxima: 7 segundos
         for i in {1..7}; do
             if grep -q "Connection confirmed" "$LOG_FILE"; then
                 ACTIVE_DNS="$SERVER"
@@ -100,24 +107,29 @@ connect_auto() {
                 echo "Ctrl + C para desconectar"
                 echo 'Escriba "menu" para volver al menú'
                 echo
+
                 wait_for_menu
                 trap - INT
                 return
             fi
+
             if grep -q "Connection closed" "$LOG_FILE"; then
                 break
             fi
             sleep 1
         done
+
         trap - INT
         clean_slipstream
     done
+
     echo "[X] No se pudo conectar con ningún servidor"
     read -p "ENTER para volver al menú"
 }
 
 while true; do
     clear
+
     NET=$(detect_network)
     DATA_MARK="○"
     WIFI_MARK="○"
@@ -132,7 +144,6 @@ while true; do
     echo "  ╚═══╝  ╚═╝╚═╝     "
     echo
     echo "DNS Activo: $ACTIVE_DNS"
-    echo "Dominio: $DOMAIN"
     echo
     echo "$DATA_MARK 1) Conectar en Datos Móviles"
     echo "$WIFI_MARK 2) Conectar en WiFi"
@@ -140,6 +151,7 @@ while true; do
     echo "  0) Salir"
     echo
     read -p "Selecciona una opción: " opt
+
     case $opt in
         1) connect_auto "${DATA_SERVERS[@]}" ;;
         2) connect_auto "${WIFI_SERVERS[@]}" ;;
