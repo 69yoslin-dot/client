@@ -1,57 +1,90 @@
 #!/data/data/com.termux/files/usr/bin/bash
+# Nombre del archivo: setup.sh
 
-clear
-export APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
+# --- CONFIGURACIÓN MAESTRA ---
+DOMAIN="freezing-dns.duckdns.org"
+LOCAL_PORT="5201"
+# -----------------------------
 
-if [ ! -d "/data/data/com.termux" ]; then
-    echo "[!] Este script solo funciona en Termux."
-    exit 1
-fi
+LOG_FILE="$HOME/.slipstream_log"
+trap "pkill -f slipstream-client; exit" SIGINT SIGTERM
 
-if ! command -v dialog >/dev/null 2>&1; then
-    pkg update -y && pkg install dialog -y
-fi
+# Servidores DNS (ETECSA / Cuba)
+DATA_SERVERS=("200.55.128.130:53" "200.55.128.140:53" "200.55.128.3:53" "200.55.128.4:53")
+WIFI_SERVERS=("181.225.231.120:53" "181.225.231.110:53" "181.225.233.40:53")
 
-MODE="DIALOG"
-[[ ! $(command -v dialog) ]] && MODE="TEXT"
+start_tunnel() {
+    local DNS_IP="$1"
+    pkill -f slipstream-client
+    
+    echo -e "\e[1;33m[*] Conectando a través de: $DNS_IP ...\e[0m"
+    
+    # Ejecución oculta
+    ./slipstream-client \
+        --tcp-listen-port=$LOCAL_PORT \
+        --resolver="$DNS_IP" \
+        --domain="$DOMAIN" \
+        --keep-alive-interval=20 \
+        > "$LOG_FILE" 2>&1 &
+        
+    PID=$!
+    
+    # Barra de carga falsa para dar tiempo a la conexión
+    echo -ne "\e[1;36m[Espere] \e[0m"
+    for i in {1..5}; do echo -ne "▓"; sleep 1; done
+    echo ""
 
-msg() { [ "$MODE" = "DIALOG" ] && dialog --msgbox "$1" 10 55 || echo -e "\n$1\n"; }
-
-confirm() {
-    if [ "$MODE" = "DIALOG" ]; then
-        dialog --yesno "$1" 8 45
-        return $?
+    # Verificación simple (Revisa si el proceso sigue vivo)
+    if ps -p $PID > /dev/null; then
+        clear
+        echo -e "\e[1;32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
+        echo -e "\e[1;37m        CONEXIÓN ESTABLECIDA            \e[0m"
+        echo -e "\e[1;32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
+        echo -e " \e[1;34m»\e[0m Estado: \e[1;32mONLINE\e[0m"
+        echo -e " \e[1;34m»\e[0m DNS:    \e[1;37m$DNS_IP\e[0m"
+        echo -e " \e[1;34m»\e[0m Server: \e[1;37m$DOMAIN\e[0m"
+        echo -e "\e[1;32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
+        echo -e "\e[1;33m[!] Configura tu HTTP Custom / Injector:\e[0m"
+        echo -e "    IP: 127.0.0.1"
+        echo -e "    Puerto: $LOCAL_PORT"
+        echo -e "\e[1;32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
+        echo -e "\e[1;30mPresiona ENTER para desconectar y salir...\e[0m"
+        read temp
+        pkill -f slipstream-client
     else
-        read -p "$1 (y/n): " r
-        [[ "$r" =~ ^[Yy]$ ]]
+        echo -e "\e[1;31m[!] Falló la conexión con este DNS.\e[0m"
+        sleep 2
     fi
 }
 
-msg "Bienvenido al instalador SS.MADARAS.\n\nSe configurará el cliente para: freezing-dns.duckdns.org"
+menu() {
+    while true; do
+        clear
+        echo -e "\e[1;36m   SS.MADARAS | $DOMAIN \e[0m"
+        echo -e "\e[1;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
+        echo -e "  \e[1;37m[1]\e[0m Conectar Datos Móviles (Auto)"
+        echo -e "  \e[1;37m[2]\e[0m Conectar WiFi / Nauta (Auto)"
+        echo -e "  \e[1;37m[0]\e[0m Salir"
+        echo -e "\e[1;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\e[0m"
+        read -p "Elige una opción: " opt
 
-confirm "¿Deseas continuar?"
-[ $? -ne 0 ] && clear && exit 1
-
-install_with_progress() {
-    echo 10; pkg update -y >/dev/null 2>&1
-    echo 30; pkg upgrade -y >/dev/null 2>&1
-    echo 50; pkg install wget brotli openssl openssl-tool termux-tools iproute2 -y >/dev/null 2>&1
-    echo 70; wget -q -O slipstream-client https://raw.githubusercontent.com/Mahboub-power-is-back/quic_over_dns/main/slipstream-client
-    echo 90; chmod +x slipstream-client
-    echo 100
+        case $opt in
+            1) 
+                for server in "${DATA_SERVERS[@]}"; do
+                    start_tunnel "$server"
+                    break # Quita este break si quieres que pruebe el siguiente si falla
+                done
+                ;;
+            2)
+                for server in "${WIFI_SERVERS[@]}"; do
+                    start_tunnel "$server"
+                    break
+                done
+                ;;
+            0) exit 0 ;;
+            *) echo "Opción inválida"; sleep 1 ;;
+        esac
+    done
 }
 
-if [ "$MODE" = "DIALOG" ]; then
-    install_with_progress | dialog --gauge "Instalando herramientas..." 10 60 0
-else
-    install_with_progress
-fi
-
-# Mensaje final con el dominio correcto
-if [ "$MODE" = "DIALOG" ]; then
-    dialog --clear --title "SS.MADARAS" \
-        --msgbox "Instalación completada.\n\nDominio: freezing-dns.duckdns.org\nPuerto local: 5201\n\nYa puedes ejecutar setup.sh" 12 50
-else
-    echo -e "\nInstalación completa. Dominio: freezing-dns.duckdns.org"
-fi
-clear
+menu
