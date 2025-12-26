@@ -12,19 +12,19 @@ CLIENT_BIN="./slipstream-client"
 
 mkdir -p "$LOG_DIR"
 
-# Servidores oficiales de ETECSA (Puerto 443)
+# Servidores oficiales de ETECSA
 DATA_SERVERS=(
-"200.55.128.130:443"
-"200.55.128.140:443"
-"200.55.128.230:443"
-"200.55.128.250:443"
+"200.55.128.130:53"
+"200.55.128.140:53"
+"200.55.128.230:53"
+"200.55.128.250:53"
 )
 
 WIFI_SERVERS=(
-"181.225.231.120:443"
-"181.225.231.110:443"
-"181.225.233.40:443"
-"181.225.233.30:443"
+"181.225.231.120:53"
+"181.225.231.110:53"
+"181.225.233.40:53"
+"181.225.233.30:53"
 )
 
 # Colores para la interfaz
@@ -68,19 +68,19 @@ connect_auto() {
 
         trap trap_ctrl_c INT
 
-        # Ejecución optimizada para puerto 443
+        # Ejecución del binario enviando salida al log
         $CLIENT_BIN \
             --tcp-listen-port=5201 \
             --resolver="$SERVER" \
             --domain="$DOMAIN" \
-            --keep-alive-interval=30 \
+            --keep-alive-interval=600 \
             --congestion-control=cubic \
             > >(tee -a "$LOG_FILE") 2>&1 &
 
         PID=$!
 
-        # VALIDACIÓN RÁPIDA: Máximo 8 segundos
-        for i in {1..8}; do
+        # VALIDACIÓN ÉTICA: Esperamos hasta 10 segundos por la confirmación real
+        for i in {1..10}; do
             if grep -q "Connection confirmed" "$LOG_FILE"; then
                 ACTIVE_DNS="$SERVER"
                 clear
@@ -93,6 +93,7 @@ connect_auto() {
                 echo -e "${Y}Escriba 'menu' para desconectar y volver.${NC}"
                 echo ""
 
+                # Bucle de espera de comando
                 while true; do
                     echo -n "ss_madaras > "
                     read -r input
@@ -111,7 +112,7 @@ connect_auto() {
                 echo -e "${R}[X] Servidor rechazó la conexión.${NC}"
                 break
             fi
-            echo -ne "${Y}Esperando respuesta... $i/8\r${NC}"
+            echo -ne "${Y}Esperando respuesta... $i/10\r${NC}"
             sleep 1
         done
 
@@ -133,7 +134,6 @@ while true; do
     echo "------------------------------------"
     echo -e "${W}Red detectada: ${Y}$NET${NC}"
     echo -e "${W}Estado actual: ${G}$ACTIVE_DNS${NC}"
-    echo -e "${W}Puerto Server: ${P}443${NC}"
     echo "------------------------------------"
     echo -e "${W}1) Conectar en Datos Móviles${NC}"
     echo -e "${W}2) Conectar en WiFi Nauta${NC}"
