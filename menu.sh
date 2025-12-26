@@ -1,7 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
 # ==========================================
-#  CLIENTE OFICIAL - SS_MADARAS VIP (FAST-DNS)
+#  CLIENTE OFICIAL - SS_MADARAS VIP
 # ==========================================
 
 DOMAIN="freezing-dns.duckdns.org"
@@ -47,10 +47,10 @@ clean_slipstream() {
 }
 
 trap_ctrl_c() {
-    echo -e "\n${R}[!] Conexión interrumpida${NC}"
+    echo -e "\n${R}[!] Conexión interrumpida por el usuario${NC}"
     clean_slipstream
     ACTIVE_DNS="No conectado"
-    return
+    sleep 2
 }
 
 connect_auto() {
@@ -63,24 +63,24 @@ connect_auto() {
         clear
         echo -e "${P}🦊 SS_MADARAS VIP${NC}"
         echo -e "${Y}[*] Probando servidor: ${W}$SERVER${NC}"
+        echo -e "${C}Dominio: ${W}$DOMAIN${NC}"
         echo "------------------------------------"
 
         trap trap_ctrl_c INT
 
-        # EJECUCIÓN RELÁMPAGO (Estilo Razihel)
+        # Ejecución del binario enviando salida al log
         $CLIENT_BIN \
             --tcp-listen-port=5201 \
             --resolver="$SERVER" \
             --domain="$DOMAIN" \
-            --keep-alive-interval=30 \
+            --keep-alive-interval=600 \
             --congestion-control=cubic \
-            --packet-size=1200 \
             > >(tee -a "$LOG_FILE") 2>&1 &
 
         PID=$!
 
-        # VALIDACIÓN RÁPIDA: Máximo 8 segundos (Si no conecta, no conectará)
-        for i in {1..8}; do
+        # VALIDACIÓN ÉTICA: Esperamos hasta 10 segundos por la confirmación real
+        for i in {1..10}; do
             if grep -q "Connection confirmed" "$LOG_FILE"; then
                 ACTIVE_DNS="$SERVER"
                 clear
@@ -90,9 +90,10 @@ connect_auto() {
                 echo -e "${W}DNS Activo: ${C}$ACTIVE_DNS${NC}"
                 echo -e "${W}Puerto Local: ${P}127.0.0.1:5201${NC}"
                 echo "------------------------------------"
-                echo -e "${Y}Escriba 'menu' para volver.${NC}"
+                echo -e "${Y}Escriba 'menu' para desconectar y volver.${NC}"
                 echo ""
 
+                # Bucle de espera de comando
                 while true; do
                     echo -n "ss_madaras > "
                     read -r input
@@ -107,22 +108,22 @@ connect_auto() {
                 return
             fi
 
-            if grep -q "Connection closed" "$LOG_FILE" || grep -q "Error" "$LOG_FILE"; then
-                echo -e "${R}[X] Rechazado por el servidor.${NC}"
+            if grep -q "Connection closed" "$LOG_FILE"; then
+                echo -e "${R}[X] Servidor rechazó la conexión.${NC}"
                 break
             fi
-            echo -ne "${Y}Buscando señal... $i/8\r${NC}"
+            echo -ne "${Y}Esperando respuesta... $i/10\r${NC}"
             sleep 1
         done
 
         trap - INT
         clean_slipstream
-        echo -e "\n${R}[!] Servidor sin respuesta.${NC}"
+        echo -e "\n${R}[!] Falló servidor $SERVER${NC}"
         sleep 1
     done
 
-    echo -e "\n${R}[X] Agotados todos los servidores.${NC}"
-    read -p "ENTER para volver"
+    echo -e "\n${R}[X] No se pudo establecer el túnel DNS.${NC}"
+    read -p "Presione ENTER para volver"
 }
 
 while true; do
