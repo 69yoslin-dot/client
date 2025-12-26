@@ -106,7 +106,7 @@ final_message() {
 
     if [ "$MODE" = "DIALOG" ]; then
         while true; do
-            choice=$(dialog --clear --title "VIP" \
+            choice=$(dialog --clear --title "SS.MADARAS VIP" \
                 --menu "Instalación completada correctamente." 10 50 2 \
                 1 "SALIR" \
                 2 "CONTRATAR VIP" 3>&1 1>&2 2>&3)
