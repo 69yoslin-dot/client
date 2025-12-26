@@ -2,8 +2,8 @@
 
 clear
 
-# Configuración Maestra
-DOMAIN="dns.freezing.work.gd"
+# Configuración Maestra (ACTUALIZADO A DUCKDNS)
+DOMAIN="freezing-dns.duckdns.org"
 ACTIVE_DNS="No conectado"
 LOG_DIR="$HOME/.slipstream"
 LOG_FILE="$LOG_DIR/slip.log"
@@ -23,13 +23,6 @@ clean_slipstream() {
     sleep 1
 }
 
-trap_ctrl_c() {
-    echo -e "\n[!] Desconectando..."
-    clean_slipstream
-    ACTIVE_DNS="No conectado"
-    return
-}
-
 connect_auto() {
     local SERVERS=("$@")
     for SERVER in "${SERVERS[@]}"; do
@@ -38,37 +31,38 @@ connect_auto() {
         clear
         echo -e "\e[1;34m[*] SS.MADARAS PROBANDO: $SERVER\e[0m"
 
+        # Ejecución del cliente
         ./slipstream-client \
             --tcp-listen-port=5201 \
             --resolver="$SERVER" \
             --domain="$DOMAIN" \
-            --keep-alive-interval=30 \
-            --congestion-control=cubic \
+            --keep-alive-interval=20 \
             > "$LOG_FILE" 2>&1 &
 
-        # Bucle de detección de conexión (Ajustado a 10s)
-        for i in {1..10}; do
-            # Buscamos 'assigned stream id' que es la señal real de éxito
-            if grep -qE "Connection confirmed|assigned stream id" "$LOG_FILE"; then
+        # Detección de conexión exitosa
+        for i in {1..12}; do
+            # Buscamos la señal de éxito en el log
+            if grep -qE "Connection confirmed|assigned stream id|Stream opened" "$LOG_FILE"; then
                 ACTIVE_DNS="$SERVER"
                 clear
                 echo -e "\e[1;32m████████████████████████████████"
-                echo -e "[✓] SS.MADARAS: CONEXIÓN CONFIRMADA"
+                echo -e "[✓] SS.MADARAS: CONEXIÓN EXITOSA"
                 echo -e "[✓] DNS Activo: $ACTIVE_DNS"
+                echo -e "[✓] Dominio: $DOMAIN"
                 echo -e "████████████████████████████████\e[0m"
                 echo -e "\n\e[1;37mPASO FINAL: Abre HTTP Custom y conecta a 127.0.0.1:5201\e[0m"
                 echo -e "\nEscriba 'menu' para desconectar."
                 
                 while true; do
                     read -p "> " cmd
-                    [[ "$cmd" == "menu" ]] && clean_slipstream && return
+                    [[ "$cmd" == "menu" ]] && clean_slipstream && ACTIVE_DNS="No conectado" && return
                 done
             fi
             sleep 1
         done
         clean_slipstream
     done
-    echo "[X] Error en todos los servidores. Revisa tu VPS."
+    echo -e "\e[1;31m[X] Error en todos los servidores. Revisa tu VPS o certificados.\e[0m"
     read -p "ENTER para volver"
 }
 
@@ -83,10 +77,10 @@ while true; do
     echo -e "╚════██║╚════██║    ██║╚██╔╝██║██║  ██║"
     echo -e "███████║███████║    ██║ ╚═╝ ██║██████╔╝"
     echo -e "╚══════╝╚══════╝    ╚═╝     ╚═╝╚═════╝\e[0m"
-    echo -e "      \e[1;32mDNS: $ACTIVE_DNS\e[0m\n"
-    echo -e "$D 1) Conectar Datos Móviles"
-    echo -e "$W 2) Conectar WiFi ETECSA"
-    echo -e "   3) Reinstalar Herramientas"
+    echo -e "      \e[1;32mESTADO: $ACTIVE_DNS\e[0m\n"
+    echo -e "$D 1) Conectar Datos Móviles (ETECSA)"
+    echo -e "$W 2) Conectar WiFi (ETECSA)"
+    echo -e "   3) Reinstalar Cliente"
     echo -e "   0) Salir"
     echo
     read -p "Opción: " opt
@@ -94,7 +88,7 @@ while true; do
     case $opt in
         1) connect_auto "${DATA_SERVERS[@]}" ;;
         2) connect_auto "${WIFI_SERVERS[@]}" ;;
-        3) ./install-vip.sh ;;
+        3) bash install-client.sh ;;
         0) clean_slipstream; exit ;;
     esac
 done
