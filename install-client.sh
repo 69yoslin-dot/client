@@ -81,7 +81,7 @@ connect_auto() {
 
         trap trap_ctrl_c INT
 
-        # Ejecución del cliente
+        # Ejecución silenciando errores de Netlink/Socket para evitar ruido
         ./slipstream-client \
             --tcp-listen-port=5201 \
             --resolver="$SERVER" \
@@ -90,13 +90,16 @@ connect_auto() {
             --congestion-control=cubic \
             > >(tee -a "$LOG_FILE") 2>&1 &
 
-        # CAMBIO AQUÍ: En lugar de buscar una frase, verificamos si el puerto 5201 se abrió
-        # Esto es mucho más fiable para tu versión de servidor.
-        for i in {1..10}; do
-            if ss -tpln | grep -q ":5201"; then
+        # Verificación inteligente (Doble validación)
+        for i in {1..12}; do
+            # 1. Comprobamos si el binario confirmó la conexión en el LOG
+            # 2. Comprobamos si el puerto 5201 está realmente abierto y escuchando
+            if grep -q "Connection confirmed" "$LOG_FILE" || ss -tpln | grep -q ":5201"; then
                 ACTIVE_DNS="$SERVER"
                 clear
-                echo "[✓] CONEXIÓN CONFIRMADA"
+                echo "████████████████████████████████"
+                echo "      CONEXIÓN CONFIRMADA"
+                echo "████████████████████████████████"
                 echo "[✓] DNS Activo: $ACTIVE_DNS"
                 echo "------------------------------------------------"
                 echo "1. Ve a tu App SSH (HTTP Custom/Injector/etc)"
@@ -108,6 +111,11 @@ connect_auto() {
                 wait_for_menu
                 trap - INT
                 return
+            fi
+
+            # Si el log dice que se cerró, saltamos al siguiente DNS de inmediato
+            if grep -q "Connection closed" "$LOG_FILE"; then
+                break
             fi
             sleep 1
         done
