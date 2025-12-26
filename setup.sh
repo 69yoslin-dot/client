@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ==========================================
-#  INSTALADOR OFICIAL - SS_MADARAS
+#  INSTALADOR OFICIAL - SS_MADARAS VIP
 # ==========================================
 
 # COLORES
@@ -9,7 +9,7 @@ G='\033[1;32m'
 Y='\033[1;33m'
 C='\033[1;36m'
 W='\033[1;37m'
-P='\033[1;35m' # Purple
+P='\033[1;35m'
 NC='\033[0m'
 
 clear
@@ -25,33 +25,46 @@ if [ ! -d "/data/data/com.termux" ]; then
     exit 1
 fi
 
-# 2. Instalar Dependencias
-echo -e "${Y}[*] Preparando sistema...${NC}"
-pkg update -y > /dev/null 2>&1
-pkg install wget curl figlet -y > /dev/null 2>&1
+# 2. Reparar Repositorios y Dependencias (Arreglo para evitar el error de librerías)
+echo -e "${Y}[*] Actualizando librerías base...${NC}"
+pkg update -y && pkg upgrade -y
+pkg install wget curl procps libandroid-posix-semaphore libuuid -y > /dev/null 2>&1
 
-# 3. Descargar Cliente
-# ¡OJO! CAMBIA ESTE LINK POR EL TUYO DE GITHUB (El raw del archivo compilado)
+# 3. Descargar Cliente (Motor Binario)
+# Este es el link directo a tu motor en AlexHost
 CLIENT_URL="https://github.com/69yoslin-dot/client/raw/main/slipstream-client-android"
 CLIENT_BIN="slipstream-client"
 
-echo -e "${Y}[*] Instalando motor VIP...${NC}"
+echo -e "${Y}[*] Instalando motor VIP (DNS-QUIC)...${NC}"
 wget -O $CLIENT_BIN $CLIENT_URL -q --show-progress
 
 if [ -f "$CLIENT_BIN" ]; then
     chmod +x $CLIENT_BIN
 else
-    echo -e "${R}[!] Error de descarga. Revisa tu internet.${NC}"
+    echo -e "${R}[!] Error crítico: No se pudo descargar el motor.${NC}"
     exit 1
 fi
 
-# 4. Descargar Menu
-# CAMBIA ESTE LINK POR EL TUYO DE GITHUB (El raw de menu.sh)
+# 4. Descargar Menú Ético (El que no miente)
 MENU_URL="https://github.com/69yoslin-dot/client/raw/main/menu.sh"
+echo -e "${Y}[*] Configurando panel de control...${NC}"
 wget -O menu.sh $MENU_URL -q
-chmod +x menu.sh
+
+if [ -f "menu.sh" ]; then
+    chmod +x menu.sh
+else
+    echo -e "${R}[!] Error al descargar el menú.${NC}"
+    exit 1
+fi
+
+# 5. Limpieza y Finalización
+# Creamos la carpeta de logs para que el menú ético pueda trabajar
+mkdir -p "$HOME/.slipstream"
 
 echo ""
-echo -e "${G}✅ INSTALACIÓN COMPLETADA${NC}"
-echo -e "${W}Escribe ${Y}./menu.sh${W} y pulsa ENTER.${NC}"
+echo -e "${G}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${G}       ✅ INSTALACIÓN COMPLETADA         ${NC}"
+echo -e "${G}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${W} Para iniciar, escribe:${NC}"
+echo -e "${Y} ./menu.sh${NC}"
 echo ""
