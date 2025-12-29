@@ -6,8 +6,11 @@ DOMAIN="freezing-dns.duckdns.org"
 
 LOG_FILE="$HOME/.slip.log"
 
+# Limpieza profunda de procesos
 clean() {
     pkill -f slipstream-client 2>/dev/null
+    # Matar cualquier proceso que use el puerto 5201
+    fuser -k 5201/tcp 2>/dev/null
     sleep 1
 }
 
@@ -16,7 +19,7 @@ setup() {
         clear
         echo "[*] Instalando motor VIP..."
         pkg update -y >/dev/null 2>&1
-        pkg install wget dos2unix -y >/dev/null 2>&1
+        pkg install wget dos2unix psmisc -y >/dev/null 2>&1
         wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/quic_over_dns/main/slipstream-client
         chmod +x slipstream-client
         sleep 2
@@ -37,7 +40,8 @@ connect() {
             --congestion-control=cubic \
             --gso=false > "$LOG_FILE" 2>&1 &
         
-        for i in {1..10}; do
+        # Aumentamos el tiempo de espera a 12 segundos para redes lentas
+        for i in {1..12}; do
             if grep -q "Connection confirmed" "$LOG_FILE"; then
                 clear
                 echo "========================================="
@@ -56,7 +60,7 @@ connect() {
         done
         clean
     done
-    echo "[X] No se pudo conectar."
+    echo "[X] No se pudo conectar. Prueba con Datos Móviles."
     read -p "ENTER para volver"
 }
 
@@ -71,7 +75,6 @@ while true; do
     echo "    ╚═══╝  ╚═╝╚═╝     "
     echo "    --- FREEZING-DNS VIP ---"
     echo "-----------------------------------------"
-    # Detección de red protegida para evitar el error de Permisos
     NET_INFO=$(ip route show 2>/dev/null | grep default | awk '{print $5}')
     echo " Red: ${NET_INFO:-Desconocida (Sin Permisos)}"
     echo "-----------------------------------------"
