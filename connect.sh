@@ -1,6 +1,8 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
+# ==========================================
 # CONFIGURACION DEL DUEÑO
+# ==========================================
 DOMAIN="freezing.2bd.net"
 OWNER="SS.MADARAS"
 TELEGRAM="https://t.me/ss_madaras"
@@ -43,13 +45,19 @@ cleanup() {
     rm -f "$LOG_FILE"
 }
 
+# DETECTOR DE ERRORES EN LOG (NUEVO: MEJORA DE ESTABILIDAD)
+dns_dead() {
+    grep -qE "Connection closed|resolver timeout|no response|broken pipe" "$LOG_FILE"
+}
+
 # INTERRUPCION CTRL+C
 trap_ctrl_c() {
-    echo -e "\n${R}[!] Deteniendo servicios...${W}"
+    echo -e "\n${R}[!] Deteniendo servicios y volviendo al menú...${W}"
     cleanup
     ACTIVE_DNS="${R}Desconectado${W}"
     sleep 1
-    return
+    # Esto rompe el bucle de conexión y vuelve al menú principal
+    return 1 2>/dev/null
 }
 
 # CABECERA GRAFICA
@@ -78,59 +86,76 @@ detect_net() {
     fi
 }
 
+# LOGICA DE CONEXION MEJORADA (MOTOR NUEVO)
 connect_logic() {
     local SERVERS=("$@")
     
-    for SERVER in "${SERVERS[@]}"; do
-        cleanup
-        header
-        echo -e "${Y}[*] Intentando conectar vía: ${W}$SERVER"
-        
-        trap trap_ctrl_c INT
-
-        # EJECUCION DEL CLIENTE
-        ./slipstream-client \
-            --tcp-listen-port=5201 \
-            --resolver="$SERVER" \
-            --domain="$DOMAIN" \
-            --keep-alive-interval=600 \
-            --congestion-control=cubic \
-            > >(tee -a "$LOG_FILE") 2>&1 &
-            
-        PID=$!
-        
-        # BARRA DE CARGA FALSA MIENTRAS CONECTA
-        echo -ne "${C}[Espere] Conectando${W} "
-        for i in {1..5}; do echo -ne "."; sleep 0.5; done
-        echo ""
-
-        if grep -q "Connection confirmed" "$LOG_FILE"; then
-             ACTIVE_DNS="${G}CONECTADO ($SERVER)${W}"
-             header
-             echo -e "${G} [✓] CONEXIÓN ESTABLECIDA CON ÉXITO ${W}"
-             echo -e "${W} ---------------------------------- ${W}"
-             echo -e "  El túnel está activo en segundo plano."
-             echo -e "  Mantén esta ventana abierta."
-             echo -e "  Pulsa ${R}Ctrl + C${W} para desconectar."
-             echo -e "${W} ---------------------------------- ${W}"
-             
-             # MANTENER VIVO EL LOOP HASTA CTRL+C
-             while true; do
-                if ! kill -0 $PID 2>/dev/null; then
-                    echo -e "\n${R}[!] Conexión perdida.${W}"
-                    break
-                fi
-                sleep 2
-             done
-             return
-        fi
-        
-        # SI FALLA
-        kill $PID 2>/dev/null
-    done
+    # Trampa para salir del bucle infinito con Ctrl+C
+    trap 'trap_ctrl_c; return' INT
     
-    echo -e "\n${R}[X] No se pudo conectar con ningún servidor DNS.${W}"
-    read -p "Presiona ENTER para volver..."
+    # Bucle infinito para auto-reconexión
+    while true; do
+        for SERVER in "${SERVERS[@]}"; do
+            cleanup
+            header
+            echo -e "${Y}[*] Conectando vía: ${W}$SERVER"
+            echo -e "${C}[i] Sistema de Auto-Reconexión: ACTIVO${W}"
+            
+            # EJECUCION DEL CLIENTE
+            ./slipstream-client \
+                --tcp-listen-port=5201 \
+                --resolver="$SERVER" \
+                --domain="$DOMAIN" \
+                --keep-alive-interval=600 \
+                --congestion-control=cubic \
+                > >(tee -a "$LOG_FILE") 2>&1 &
+                
+            PID=$!
+            
+            # BARRA DE CARGA
+            echo -ne "${C}[Espere] Conectando${W} "
+            for i in {1..4}; do echo -ne "."; sleep 0.5; done
+            echo ""
+
+            # VERIFICACION INICIAL
+            if grep -q "Connection confirmed" "$LOG_FILE"; then
+                 ACTIVE_DNS="${G}CONECTADO ($SERVER)${W}"
+                 header
+                 echo -e "${G} [✓] CONEXIÓN ESTABLECIDA ${W}"
+                 echo -e "${W} ---------------------------------- ${W}"
+                 echo -e "  El túnel está monitoreando la red..."
+                 echo -e "  Si falla, cambiará de servidor solo."
+                 echo -e "  Pulsa ${R}Ctrl + C${W} para volver al menú."
+                 echo -e "${W} ---------------------------------- ${W}"
+                 
+                 # MANTENER VIVO Y VIGILAR LOGS (HEALTH CHECK)
+                 while true; do
+                    # 1. Chequeo de proceso
+                    if ! kill -0 $PID 2>/dev/null; then
+                        echo -e "\n${R}[!] Proceso detenido.${W}"
+                        break # Rompe y va al siguiente server
+                    fi
+                    
+                    # 2. Chequeo de errores en log (ZOMBIE KILLER)
+                    if dns_dead; then
+                        echo -e "\n${R}[!] Fallo de DNS detectado (Timeout).${W}"
+                        echo -e "${Y}[*] Buscando siguiente servidor...${W}"
+                        kill $PID 2>/dev/null
+                        break # Rompe y va al siguiente server
+                    fi
+                    
+                    sleep 2
+                 done
+            else
+                # Si falló al iniciar
+                kill $PID 2>/dev/null
+            fi
+        done
+        
+        # Si terminamos la lista de servidores, esperamos y reiniciamos
+        echo -e "\n${R}[!] Ciclo completado. Reintentando en 3s...${W}"
+        sleep 3
+    done
 }
 
 # MENU PRINCIPAL
@@ -143,6 +168,9 @@ while true; do
         ICON_DATA="${R}○${W}"
         ICON_WIFI="${G}●${W}"
     fi
+
+    # Resetear trampa por si acaso
+    trap - INT
 
     header
     echo -e "${W}  1) ${ICON_DATA} Conectar ETECSA (Datos Móviles)"
