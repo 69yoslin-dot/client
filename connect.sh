@@ -3,7 +3,7 @@
 # ==========================================
 # CONFIGURACION DEL DUEÑO
 # ==========================================
-DOMAIN="freezing.2bd.net"
+DOMAIN="dns.freezing.2bd.net"
 OWNER="SS.MADARAS"
 TELEGRAM="https://t.me/ss_madaras"
 
