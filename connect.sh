@@ -5,7 +5,8 @@
 # ==================================================
 
 # --- CONFIGURACIÓN DEL SERVIDOR ---
-DOMAIN="ns1.freezing.2bd.net"
+# Dominio actualizado a madaras.publicvm.com
+DOMAIN="madaras.publicvm.com"
 LOCAL_PORT="5201"
 
 # --- LISTAS DE SERVIDORES (Lógica de Razihel) ---
@@ -144,7 +145,7 @@ while true; do
     case $opt in
         1) conectar_auto "${DATA_SERVERS[@]}" ;;
         2) conectar_auto "${WIFI_SERVERS[@]}" ;;
-        3) pkg install wget dnsutils -y ;;
+        3) pkg install wget dnsutils brotli openssl -y ;;
         0) limpiar_procesos; clear; exit 0 ;;
         *) echo "Opción inválida" ;;
     esac
