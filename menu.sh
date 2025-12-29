@@ -1,12 +1,11 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
 # ==========================================
-#  CLIENTE OFICIAL - SS_MADARAS VIP (v2.2)
-#  Optimizado para: freezing.2bd.net
+#  CLIENTE OFICIAL - SS_MADARAS VIP (v2.3)
+#  Corregido: Motor de conexión mejorado
 # ==========================================
 
 # --- CONFIGURACIÓN DEL USUARIO ---
-# Actualizado al nuevo dominio gratuito configurado en FreeDomain.One
 DOMAIN="freezing.2bd.net" 
 LOG_DIR="$HOME/.slipstream"
 LOG_FILE="$LOG_DIR/slip.log"
@@ -24,13 +23,12 @@ B='\033[1;34m' # Azul
 
 mkdir -p "$LOG_DIR"
 
-# --- SERVIDORES DNS ETECSA ---
+# --- SERVIDORES DNS ETECSA (SOLO LOS REALES) ---
 DATA_SERVERS=(
 "200.55.128.130:53"
 "200.55.128.140:53"
 "200.55.128.230:53"
 "200.55.128.250:53"
-"217.156.64.35:53" # Tu IP directa como respaldo
 )
 
 WIFI_SERVERS=(
@@ -38,7 +36,6 @@ WIFI_SERVERS=(
 "181.225.231.110:53"
 "181.225.233.40:53"
 "181.225.233.30:53"
-"217.156.64.35:53" # Tu IP directa como respaldo
 )
 
 # --- FUNCIONES ---
@@ -57,7 +54,7 @@ banner() {
     echo " ▄▄▄▄▄▄▄▄▄█░▌ ▄▄▄▄▄▄▄▄▄█░▌ "
     echo "▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌ "
     echo " ▀▀▀▀▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀▀▀▀▀  "
-    echo -e "${W}     Premium VIP v2.2"
+    echo -e "${W}     Premium VIP v2.3"
     echo -e "${C}   By SS.MADARAS | CUBA"
     echo -e "${W}=============================="
 }
@@ -76,7 +73,9 @@ trap_ctrl_c() {
 
 connect_auto() {
     local SERVERS=("$@")
+    local CONNECTED=false
     
+    # Bucle de reintentos
     for SERVER in "${SERVERS[@]}"; do
         clean_slipstream
         
@@ -99,51 +98,59 @@ connect_auto() {
             
         PID=$!
         
-        # Animación de conexión
-        echo -ne "${G}Sincronizando: [${W}"
-        for k in {1..10}; do echo -ne "▓"; sleep 0.1; done
-        echo -e "${G}]${W}"
-
-        # Validación de respuesta del servidor (10 segundos para DNS lento)
-        for i in {1..10}; do
+        # Animación de intento (rápida)
+        echo -ne "${B}Sincronizando... ${W}"
+        
+        # Validación RÁPIDA (Estilo Script B)
+        # Esperamos máximo 4 segundos para ver si conecta
+        SERVER_OK=false
+        for i in {1..4}; do
             if grep -q "Connection confirmed" "$LOG_FILE"; then
-                banner
-                echo -e "${G}██████████████████████████████${W}"
-                echo -e "${G}   CONEXIÓN REAL CONFIRMADA   ${W}"
-                echo -e "${G}██████████████████████████████${W}"
-                echo -e "Servidor   : ${Y}$SERVER${W}"
-                echo -e "Puerto Loc : ${P}127.0.0.1:5201${W}"
-                echo -e "Estado     : ${G}ONLINE ⚡${W}"
-                echo -e "${W}------------------------------"
-                echo -e "${C}Recuerda configurar tu App VPN${W}"
-                echo -e "${C}Host: 127.0.0.1 | Puerto: 5201${W}"
-                echo -e "------------------------------"
-                echo -e "${R}Presiona Ctrl + C para salir.${W}"
-                
-                # Mantener el proceso vivo
-                while kill -0 $PID 2>/dev/null; do
-                    sleep 2
-                done
-                
-                trap - INT
-                return
-            fi
-            
-            if grep -q "Connection closed" "$LOG_FILE"; then
-                echo -e "${R}[X] Rechazado por el servidor.${W}"
+                SERVER_OK=true
                 break
             fi
+            echo -ne "."
             sleep 1
         done
+
+        if $SERVER_OK; then
+            banner
+            echo -e "${G}██████████████████████████████${W}"
+            echo -e "${G}   CONEXIÓN REAL CONFIRMADA   ${W}"
+            echo -e "${G}██████████████████████████████${W}"
+            echo -e "Servidor   : ${Y}$SERVER${W}"
+            echo -e "Puerto Loc : ${Y}127.0.0.1:5201${W}"
+            echo -e "Estado     : ${G}ONLINE ⚡${W}"
+            echo -e "${W}------------------------------"
+            echo -e "${C}Recuerda configurar tu App VPN${W}"
+            echo -e "${R}Presiona Ctrl + C para detener.${W}"
+            
+            # Bucle de Mantenimiento (Como el script B)
+            # Si el proceso muere o el log dice "Closed", reiniciamos
+            while true; do
+                if ! kill -0 $PID 2>/dev/null; then
+                    echo -e "\n${R}[!] El proceso murió inesperadamente.${W}"
+                    break
+                fi
+                
+                if grep -q "Connection closed" "$LOG_FILE"; then
+                    echo -e "\n${R}[!] El servidor cerró la conexión.${W}"
+                    break
+                fi
+                sleep 2
+            done
+            
+            # Si salimos del while, es que se cayó, intentamos el siguiente
+            clean_slipstream
+        else
+            echo -e "\n${R}[X] Sin respuesta en este DNS.${W}"
+            clean_slipstream
+        fi
         
-        trap - INT
-        clean_slipstream
-        echo -e "${R}[!] Fallo en $SERVER. Saltando...${W}"
-        sleep 1
     done
     
     echo -e "\n${R}[X] Agotados todos los servidores DNS.${W}"
-    echo -e "${Y}Asegúrate de que el servidor en la VPS esté activo.${W}"
+    echo -e "${Y}Verifica tu conexión o el estado de la VPS.${W}"
     read -p "Presiona ENTER para volver..."
 }
 
