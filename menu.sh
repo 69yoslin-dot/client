@@ -1,8 +1,8 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
 # ==========================================
-#  CLIENTE OFICIAL - SS_MADARAS VIP (v2.3)
-#  Corregido: Motor de conexión mejorado
+#  CLIENTE OFICIAL - SS_MADARAS VIP (v2.4)
+#  Corregido: Error de log y salida limpia
 # ==========================================
 
 # --- CONFIGURACIÓN DEL USUARIO ---
@@ -23,7 +23,7 @@ B='\033[1;34m' # Azul
 
 mkdir -p "$LOG_DIR"
 
-# --- SERVIDORES DNS ETECSA (SOLO LOS REALES) ---
+# --- SERVIDORES DNS ETECSA ---
 DATA_SERVERS=(
 "200.55.128.130:53"
 "200.55.128.140:53"
@@ -54,7 +54,7 @@ banner() {
     echo " ▄▄▄▄▄▄▄▄▄█░▌ ▄▄▄▄▄▄▄▄▄█░▌ "
     echo "▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌ "
     echo " ▀▀▀▀▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀▀▀▀▀  "
-    echo -e "${W}     Premium VIP v2.3"
+    echo -e "${W}     Premium VIP v2.4"
     echo -e "${C}   By SS.MADARAS | CUBA"
     echo -e "${W}=============================="
 }
@@ -73,11 +73,12 @@ trap_ctrl_c() {
 
 connect_auto() {
     local SERVERS=("$@")
-    local CONNECTED=false
     
-    # Bucle de reintentos
     for SERVER in "${SERVERS[@]}"; do
         clean_slipstream
+        
+        # [CORRECCIÓN 1] Creamos el archivo antes para evitar errores
+        touch "$LOG_FILE"
         
         banner
         echo -e "${Y}[*] Buscando túnel DNS funcional...${W}"
@@ -87,29 +88,29 @@ connect_auto() {
         
         trap trap_ctrl_c INT
 
-        # Ejecución del binario
+        # [CORRECCIÓN 2] Redirección limpia (ya no ensucia la pantalla)
         ./slipstream-client \
             --tcp-listen-port=5201 \
             --resolver="$SERVER" \
             --domain="$DOMAIN" \
             --keep-alive-interval=600 \
             --congestion-control=cubic \
-            > >(tee -a "$LOG_FILE") 2>&1 &
+            > "$LOG_FILE" 2>&1 &
             
         PID=$!
         
-        # Animación de intento (rápida)
+        # Animación de intento
         echo -ne "${B}Sincronizando... ${W}"
         
-        # Validación RÁPIDA (Estilo Script B)
-        # Esperamos máximo 4 segundos para ver si conecta
         SERVER_OK=false
+        # Esperamos respuesta (4 segundos)
         for i in {1..4}; do
+            # Grep lee el archivo silenciosamente
             if grep -q "Connection confirmed" "$LOG_FILE"; then
                 SERVER_OK=true
                 break
             fi
-            echo -ne "."
+            echo -ne "▓"
             sleep 1
         done
 
@@ -125,8 +126,7 @@ connect_auto() {
             echo -e "${C}Recuerda configurar tu App VPN${W}"
             echo -e "${R}Presiona Ctrl + C para detener.${W}"
             
-            # Bucle de Mantenimiento (Como el script B)
-            # Si el proceso muere o el log dice "Closed", reiniciamos
+            # Bucle de mantenimiento
             while true; do
                 if ! kill -0 $PID 2>/dev/null; then
                     echo -e "\n${R}[!] El proceso murió inesperadamente.${W}"
@@ -140,7 +140,6 @@ connect_auto() {
                 sleep 2
             done
             
-            # Si salimos del while, es que se cayó, intentamos el siguiente
             clean_slipstream
         else
             echo -e "\n${R}[X] Sin respuesta en este DNS.${W}"
