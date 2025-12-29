@@ -5,7 +5,8 @@
 # ==================================================
 
 # --- CONFIGURACIÓN DEL SERVIDOR ---
-DOMAIN="freezing.2bd.net"
+# Se actualiza el dominio para coincidir con el registro NS configurado
+DOMAIN="ns1.freezing.2bd.net"
 LOCAL_PORT="5201"
 
 # --- LISTAS DE SERVIDORES (Lógica de Razihel) ---
@@ -56,28 +57,25 @@ limpiar_procesos() {
 }
 
 verificar_dns_muerto() {
-    # Busca errores reales en el log para reiniciar si falla
+    # Monitorea errores reales para reconexión ética
     grep -qE "Connection closed|resolver timeout|no response" "$LOG_FILE"
 }
 
-# --- MOTOR DE CONEXIÓN (LÓGICA RAZIHEL) ---
+# --- MOTOR DE CONEXIÓN (LÓGICA RAZIHEL MEJORADA) ---
 conectar_auto() {
     local SERVERS=("$@")
-    local CONNECTED=false
-    local INTENTO=0
     
-    # Bucle infinito hasta conectar o cancelar
     while true; do
         for SERVER in "${SERVERS[@]}"; do
-            limpiar_procesos
-            > "$LOG_FILE" # Limpia el log
+            limpiar_processes
+            > "$LOG_FILE" 
 
             banner
             echo -e "${YELLOW}[!] INICIANDO PROTOCOLO DE CONEXIÓN...${RESET}"
             echo -e "${GREY}--------------------------------------------${RESET}"
             echo -e "${WHITE}Intentando servidor DNS: ${CYAN}$SERVER${RESET}"
             
-            # EJECUCIÓN DEL CLIENTE (Muestra LOG REAL en segundo plano)
+            # Ejecución con LOG REAL visible para el usuario
             ./slipstream-client \
                 --tcp-listen-port=$LOCAL_PORT \
                 --resolver="$SERVER" \
@@ -89,11 +87,10 @@ conectar_auto() {
             PID=$!
             SERVER_CONNECTED=false
 
-            # Espera activa de 4 segundos leyendo el log real
-            echo -e "${GREY}[LOG] Esperando handshake...${RESET}"
-            for i in {1..4}; do
+            # Espera de 8 segundos para el handshake (Optimizado para Cuba)
+            echo -e "${GREY}[LOG] Esperando handshake real...${RESET}"
+            for i in {1..8}; do
                 if grep -q "Connection confirmed" "$LOG_FILE"; then
-                    CONNECTED=true
                     SERVER_CONNECTED=true
                     ACTIVE_DNS="$SERVER"
                     break
@@ -107,36 +104,27 @@ conectar_auto() {
                 echo -e "${GREEN}${BOLD} [✓] CONEXIÓN ESTABLECIDA EXITOSAMENTE${RESET}"
                 echo -e "${PURPLE} ────────────────────────────────────────────${RESET}"
                 echo -e "${WHITE} » DNS Activo : ${GREEN}$ACTIVE_DNS${RESET}"
-                echo -e "${WHITE} » Puerto     : ${YELLOW}$LOCAL_PORT${RESET} (Úsalo en tu VPN)"
+                echo -e "${WHITE} » Puerto     : ${YELLOW}$LOCAL_PORT${RESET}"
                 echo -e "${WHITE} » Estado     : ${GREEN}ONLINE${RESET}"
                 echo -e "${PURPLE} ────────────────────────────────────────────${RESET}"
-                echo -e "${GREY} [INFO] Monitoreando conexión en tiempo real...${RESET}"
-                echo -e "${RED} [!] Presiona CTRL + C para desconectar${RESET}"
+                echo -e "${GREY} [INFO] Monitoreando estabilidad...${RESET}"
+                echo -e "${RED} [!] Presiona CTRL + C para detener${RESET}"
 
-                # BUCLE DE MONITOREO (Mantiene el script vivo)
                 while true; do
-                    # Si el proceso muere
-                    if ! kill -0 $PID 2>/dev/null; then
-                        echo -e "\n${RED}[!] Proceso detenido inesperadamente.${RESET}"
-                        break
-                    fi
-                    # Si el log reporta error
+                    if ! kill -0 $PID 2>/dev/null; then break; fi
                     if verificar_dns_muerto; then
-                        echo -e "\n${RED}[!] El DNS dejó de responder. Reconectando...${RESET}"
+                        echo -e "\n${RED}[!] DNS Caído. Reintentando...${RESET}"
                         break
                     fi
                     sleep 2
                 done
-                # Si sale del while, vuelve a intentar con el siguiente servidor
             else
                 echo -e "${RED}[X] Fallo al conectar con $SERVER${RESET}"
-                sleep 0.5
+                sleep 1
             fi
-            
             limpiar_procesos
         done
-        
-        echo -e "\n${YELLOW}[!] Reiniciando lista de servidores...${RESET}"
+        echo -e "\n${YELLOW}[!] Reiniciando ciclo de servidores...${RESET}"
         sleep 1
     done
 }
@@ -144,19 +132,14 @@ conectar_auto() {
 # --- MENÚ PRINCIPAL ---
 while true; do
     banner
-    # Detección visual de red (Solo informativa)
     iface=$(ip route get 8.8.8.8 2>/dev/null | awk '{print $5}')
-    if [[ "$iface" == wlan* ]]; then
-        NET_TYPE="${GREEN}WIFI DETECTADO${RESET}"
-    else
-        NET_TYPE="${YELLOW}DATOS DETECTADOS${RESET}"
-    fi
+    [[ "$iface" == wlan* ]] && NET_TYPE="${GREEN}WIFI${RESET}" || NET_TYPE="${YELLOW}DATOS${RESET}"
 
-    echo -e " Estado de Red: $NET_TYPE"
+    echo -e " Estado de Red Detectado: $NET_TYPE"
     echo -e "${GREY}--------------------------------------------${RESET}"
-    echo -e "${WHITE} [1]${RESET} Conectar vía ${YELLOW}DATOS MÓVILES${RESET} (Red Móvil)"
-    echo -e "${WHITE} [2]${RESET} Conectar vía ${GREEN}WIFI / ETECSA${RESET} (Red Inalámbrica)"
-    echo -e "${WHITE} [3]${RESET} Instalar/Actualizar Dependencias"
+    echo -e "${WHITE} [1]${RESET} Conectar vía ${YELLOW}DATOS MÓVILES${RESET}"
+    echo -e "${WHITE} [2]${RESET} Conectar vía ${GREEN}WIFI / ETECSA${RESET}"
+    echo -e "${WHITE} [3]${RESET} Instalar Dependencias"
     echo -e "${WHITE} [0]${RESET} ${RED}SALIR${RESET}"
     echo -e ""
     read -p " Selecciona una opción: " opt
@@ -164,16 +147,8 @@ while true; do
     case $opt in
         1) conectar_auto "${DATA_SERVERS[@]}" ;;
         2) conectar_auto "${WIFI_SERVERS[@]}" ;;
-        3) 
-            echo -e "${CYAN}Instalando wget y herramientas...${RESET}"
-            pkg install wget termux-tools -y
-            read -p "Presiona Enter..." 
-            ;;
-        0) 
-            limpiar_procesos
-            clear
-            exit 0 
-            ;;
-        *) echo "Opción no válida" ;;
+        3) pkg install wget dnsutils -y ;;
+        0) limpiar_procesos; clear; exit 0 ;;
+        *) echo "Opción inválida" ;;
     esac
 done
