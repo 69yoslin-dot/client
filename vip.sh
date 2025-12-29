@@ -6,22 +6,24 @@ DOMAIN="freezing-dns.duckdns.org"
 
 LOG_FILE="$HOME/.slip.log"
 
-# Limpieza total de procesos
+# Limpieza total de procesos previos
 clean() {
     pkill -f slipstream-client 2>/dev/null
     sleep 1
 }
 
-# Instalación automática para clientes nuevos
+# Instalación automática para clientes nuevos (Instalación desde cero)
 setup() {
     if [ ! -f "./slipstream-client" ]; then
         clear
         echo "   --- INSTALADOR VIP ---"
         echo "[*] Preparando herramientas necesarias..."
+        # Actualiza e instala wget y dos2unix de forma silenciosa
         pkg update -y >/dev/null 2>&1
         pkg install wget dos2unix -y >/dev/null 2>&1
         
-        echo "[*] Descargando motor de conexión..."
+        echo "[*] Descargando motor de conexión optimizado..."
+        # Descarga el binario específico sugerido por Tito
         wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/quic_over_dns/main/slipstream-client
         chmod +x slipstream-client
         
@@ -30,14 +32,14 @@ setup() {
     fi
 }
 
-# Lógica de conexión automática (Afinada)
+# Lógica de conexión automática (Afinada según Tito y Carlos)
 connect() {
     local SERVERS=("$@")
     clean
     for SERVER in "${SERVERS[@]}"; do
         echo "[*] Probando enlace: $SERVER"
         
-        # Parámetros optimizados según las pistas de Tito y Carlos
+        # Parámetros optimizados: Keep-alive de 120s y GSO desactivado
         ./slipstream-client \
             --tcp-listen-port=5201 \
             --resolver="$SERVER" \
@@ -46,7 +48,7 @@ connect() {
             --congestion-control=cubic \
             --gso=false > "$LOG_FILE" 2>&1 &
         
-        # Tiempo de espera para confirmación de ETECSA
+        # Tiempo de espera de 7 segundos para el handshake con la VPS
         for i in {1..7}; do
             if grep -q "Connection confirmed" "$LOG_FILE"; then
                 clear
@@ -55,11 +57,10 @@ connect() {
                 echo "========================================="
                 echo " DNS RESPONDIDO: $SERVER"
                 echo "-----------------------------------------"
-                echo " PASOS PARA NAVEGAR:"
-                echo " 1. Abre HTTP Custom"
-                echo " 2. Ve a 'Proxified Apps' y marca 'Termux'"
-                echo " 3. Activa el 'Bypass Mode' (Interruptor verde)"
-                echo " 4. SSH: 127.0.0.1 Puerto: 5201"
+                echo " PASOS PARA NAVEGAR EN HTTP CUSTOM:"
+                echo " 1. Ve a 'Proxified Apps' y marca 'Termux'"
+                echo " 2. Activa el 'Bypass Mode' (Interruptor verde)"
+                echo " 3. En SSH usa: 127.0.0.1 Puerto: 5201"
                 echo "-----------------------------------------"
                 echo "Presiona Ctrl+C para detener el túnel"
                 wait
@@ -69,14 +70,15 @@ connect() {
         done
         clean
     done
-    echo "[X] No se pudo conectar. Cambia de DNS o reintenta."
+    echo "[X] No se pudo conectar. Reintenta o revisa tu señal."
     read -p "ENTER para volver"
 }
 
-# Menú Visual
+# Menú Visual Principal
 setup
 while true; do
     clear
+    # Logo visual VIP
     echo "  ██╗   ██╗██╗██████╗ "
     echo "  ██║   ██║██║██╔══██╗"
     echo "  ██║   ██║██║██████╔╝"
@@ -85,7 +87,8 @@ while true; do
     echo "    ╚═══╝  ╚═╝╚═╝     "
     echo "    --- FREEZING-DNS VIP ---"
     echo "-----------------------------------------"
-    echo " Red detectada: $(ip route get 8.8.8.8 2>/dev/null | awk '{print $5}')"
+    # Mejora en la detección de red para evitar el espacio vacío
+    echo " Red detectada: $(ip route show | grep default | awk '{print $5}' | head -n1)"
     echo "-----------------------------------------"
     echo " 1) CONECTAR (DATOS MÓVILES)"
     echo " 2) CONECTAR (WIFI)"
