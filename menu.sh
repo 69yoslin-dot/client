@@ -14,6 +14,7 @@ Y='\033[1;33m' # Amarillo
 C='\033[1;36m' # Cyan
 W='\033[0m'    # Blanco
 M='\033[1;35m' # Magenta
+B='\033[1;34m' # Azul
 
 mkdir -p "$LOG_DIR"
 
@@ -48,14 +49,9 @@ banner() {
     echo " ▄▄▄▄▄▄▄▄▄█░▌ ▄▄▄▄▄▄▄▄▄█░▌ "
     echo "▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌ "
     echo " ▀▀▀▀▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀▀▀▀▀  "
-    echo -e "${W}     Premium VIP v2.0"
+    echo -e "${W}     Premium VIP v2.1"
     echo -e "${C}   By SS.MADARAS | CUBA"
     echo -e "${W}=============================="
-}
-
-detect_network() {
-    iface=$(ip route get 8.8.8.8 2>/dev/null | awk '{print $5}')
-    [[ "$iface" == wlan* ]] && echo "WIFI" || echo "DATA"
 }
 
 clean_slipstream() {
@@ -72,14 +68,15 @@ trap_ctrl_c() {
 
 connect_auto() {
     local SERVERS=("$@")
+    local TYPE_NAME="$1" # Truco: Pasaremos el nombre como primer argumento si queremos imprimirlo, o lo ignoramos
     
     for SERVER in "${SERVERS[@]}"; do
         clean_slipstream
         
         banner
-        echo -e "${Y}[*] Intentando conectar...${W}"
-        echo -e "DNS: ${C}$SERVER${W}"
-        echo -e "Host: ${C}$DOMAIN${W}"
+        echo -e "${Y}[*] Buscando servidor funcional...${W}"
+        echo -e "Probando DNS: ${C}$SERVER${W}"
+        echo -e "Dominio Host: ${C}$DOMAIN${W}"
         echo ""
         
         trap trap_ctrl_c INT
@@ -94,25 +91,25 @@ connect_auto() {
             
         PID=$!
         
-        # Barra de carga falsa para efecto visual
+        # Barra de carga rápida
         echo -ne "${G}Conectando: [${W}"
-        for k in {1..10}; do echo -ne "#"; sleep 0.2; done
+        for k in {1..10}; do echo -ne "#"; sleep 0.1; done
         echo -e "${G}]${W}"
 
         # Verificar conexión (7 segundos máx)
         for i in {1..7}; do
             if grep -q "Connection confirmed" "$LOG_FILE"; then
                 banner
-                echo -e "${G}[✓] CONEXIÓN ESTABLECIDA${W}"
+                echo -e "${G}[✓] CONEXIÓN ESTABLECIDA EXITOSAMENTE${W}"
                 echo -e "${W}------------------------------"
                 echo -e "DNS Activo : ${Y}$SERVER${W}"
-                echo -e "Estado     : ${G}ONLINE${W}"
-                echo -e "Transporte : ${C}QUIC/UDP${W}"
+                echo -e "Estado     : ${G}ONLINE ⚡${W}"
+                echo -e "Protocolo  : ${C}QUIC/UDP${W}"
                 echo -e "${W}------------------------------"
-                echo -e "${C}Minimiza Termux y disfruta.${W}"
+                echo -e "${C}>> Minimiza Termux y disfruta <<${W}"
                 echo -e "${R}Presiona Ctrl + C para desconectar.${W}"
                 
-                # Mantener script vivo esperando Ctrl+C
+                # Bucle de espera
                 while kill -0 $PID 2>/dev/null; do
                     sleep 2
                 done
@@ -131,41 +128,39 @@ connect_auto() {
         clean_slipstream
     done
     
-    echo -e "\n${R}[X] Fallo al conectar con los servidores disponibles.${W}"
-    read -p "Presiona ENTER para volver..."
+    echo -e "\n${R}[X] No se pudo conectar con ningún servidor.${W}"
+    echo -e "${Y}Verifica si tienes datos activos o si elegiste la opción correcta.${W}"
+    read -p "Presiona ENTER para volver al menú..."
 }
 
 # --- BUCLE PRINCIPAL ---
 while true; do
     banner
     
-    NET=$(detect_network)
-    STATUS_TXT="${R}DESCONECTADO${W}"
-    [[ "$NET" == "DATA" ]] && NET_TYPE="${Y}DATOS MÓVILES${W}"
-    [[ "$NET" == "WIFI" ]] && NET_TYPE="${C}WI-FI${W}"
-    
-    echo -e "RED DETECTADA: $NET_TYPE"
+    echo -e "${Y}SELECCIONA TU TIPO DE CONEXIÓN:${W}"
     echo -e ""
-    echo -e "${G}[1]${W} Conectar (Automático)"
-    echo -e "${G}[2]${W} Contactar Soporte (Telegram)"
-    echo -e "${G}[3]${W} Unirse al Canal"
-    echo -e "${R}[0]${W} Salir"
+    echo -e "${G}[1]${W} ● Conexión por DATOS MÓVILES"
+    echo -e "${G}[2]${W} ● Conexión por WIFI / NAUTA"
     echo -e ""
-    echo -ne "${Y}Selecciona una opción: ${W}"
+    echo -e "${W}------------------------------"
+    echo -e "${C}[3]${W} Contactar Admin (Telegram)"
+    echo -e "${C}[4]${W} Canal Oficial"
+    echo -e "${R}[0]${W} Salir del Script"
+    echo -e ""
+    echo -ne "${B}Opción >> ${W}"
     read opt
 
     case $opt in
         1) 
-            if [[ "$NET" == "WIFI" ]]; then
-                connect_auto "${WIFI_SERVERS[@]}"
-            else
-                connect_auto "${DATA_SERVERS[@]}"
-            fi
+            connect_auto "${DATA_SERVERS[@]}"
             ;;
         2) 
-            am start -a android.intent.action.VIEW -d "$ADMIN_LINK" >/dev/null 2>&1
+            connect_auto "${WIFI_SERVERS[@]}"
             ;;
         3) 
+            am start -a android.intent.action.VIEW -d "$ADMIN_LINK" >/dev/null 2>&1
+            ;;
+        4) 
             am start -a android.intent.action.VIEW -d "$CANAL_LINK" >/dev/null 2>&1
             ;;
         0) 
@@ -175,6 +170,8 @@ while true; do
             exit 
             ;;
         *) 
+            echo -e "\n${R}Opción no válida.${W}"
+            sleep 1
             ;;
     esac
 done
