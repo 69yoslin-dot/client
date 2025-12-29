@@ -5,7 +5,6 @@
 # ==================================================
 
 # --- CONFIGURACIÓN DEL SERVIDOR ---
-# Se actualiza el dominio para coincidir con el registro NS configurado
 DOMAIN="ns1.freezing.2bd.net"
 LOCAL_PORT="5201"
 
@@ -57,17 +56,16 @@ limpiar_procesos() {
 }
 
 verificar_dns_muerto() {
-    # Monitorea errores reales para reconexión ética
     grep -qE "Connection closed|resolver timeout|no response" "$LOG_FILE"
 }
 
-# --- MOTOR DE CONEXIÓN (LÓGICA RAZIHEL MEJORADA) ---
+# --- MOTOR DE CONEXIÓN (OPTIMIZADO PARA HANDSHAKE LENTO) ---
 conectar_auto() {
     local SERVERS=("$@")
     
     while true; do
         for SERVER in "${SERVERS[@]}"; do
-            limpiar_processes
+            limpiar_procesos
             > "$LOG_FILE" 
 
             banner
@@ -75,7 +73,6 @@ conectar_auto() {
             echo -e "${GREY}--------------------------------------------${RESET}"
             echo -e "${WHITE}Intentando servidor DNS: ${CYAN}$SERVER${RESET}"
             
-            # Ejecución con LOG REAL visible para el usuario
             ./slipstream-client \
                 --tcp-listen-port=$LOCAL_PORT \
                 --resolver="$SERVER" \
@@ -87,9 +84,9 @@ conectar_auto() {
             PID=$!
             SERVER_CONNECTED=false
 
-            # Espera de 8 segundos para el handshake (Optimizado para Cuba)
-            echo -e "${GREY}[LOG] Esperando handshake real...${RESET}"
-            for i in {1..8}; do
+            # AUMENTO A 15 SEGUNDOS: Ideal para evitar el "Signal 15" prematuro
+            echo -e "${GREY}[LOG] Esperando handshake (Máx 15s)...${RESET}"
+            for i in {1..15}; do
                 if grep -q "Connection confirmed" "$LOG_FILE"; then
                     SERVER_CONNECTED=true
                     ACTIVE_DNS="$SERVER"
