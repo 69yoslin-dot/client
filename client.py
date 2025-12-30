@@ -1,35 +1,33 @@
+cat << 'EOF' > client.py
 import socket
 import time
 import sys
 import os
 import random
-from dnslib import DNSRecord, QTYPE, DNSQuestion  # Se agregó DNSQuestion aquí
+from dnslib import DNSRecord, QTYPE, DNSQuestion
 
 # ==========================================
 # CONFIGURACIÓN ACTUALIZADA
 # ==========================================
-SERVER_DOMAIN = "madaras.publicvm.com"  # <--- TU NUEVO DOMINIO
+SERVER_DOMAIN = "madaras.publicvm.com"
 MY_TELEGRAM = "https://t.me/ss_madaras"
 
-# DNS DE ETECSA (DATOS)
 DNS_DATA = [
     "200.55.128.130", "200.55.128.140", 
     "200.55.128.230", "200.55.128.250"
 ]
 
-# DNS NAUTA (WIFI)
 DNS_WIFI = [
     "181.225.231.120", "181.225.231.110", 
     "181.225.233.40", "181.225.233.30"
 ]
 
-# COLORES
-C = "\033[1;36m" # Cyan
-G = "\033[1;32m" # Green
-P = "\033[1;35m" # Purple
-R = "\033[1;31m" # Red
-W = "\033[1;37m" # White
-X = "\033[0m"    # Reset
+C = "\033[1;36m"
+G = "\033[1;32m"
+P = "\033[1;35m"
+R = "\033[1;31m"
+W = "\033[1;37m"
+X = "\033[0m"
 
 def banner():
     os.system("clear")
@@ -58,18 +56,15 @@ def start_tunnel(dns_ip):
     
     while True:
         try:
-            # Generamos subdominio único para evitar caché
-            # Ejemplo: p1.5599.madaras.publicvm.com
             subdomain = f"p{seq}.{session_id}.{SERVER_DOMAIN}"
             
-            # --- CORRECCIÓN DEL ERROR ---
+            # CORRECCIÓN PARA DNSRECORD
             q_record = DNSRecord()
             q_record.add_question(DNSQuestion(subdomain, QTYPE.A))
             pkt = q_record.pack()
-            # -----------------------------
             
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.settimeout(3) # Timeout rápido
+            sock.settimeout(3)
             
             log("SEND", f"Paquete #{seq}")
             start_t = time.time()
@@ -81,7 +76,6 @@ def start_tunnel(dns_ip):
             
             reply = DNSRecord.parse(response)
             if reply.header.rcode == 0:
-                # Buscamos si el servidor nos mandó el TXT secreto
                 is_valid = False
                 for rr in reply.rr:
                     if QTYPE[rr.rtype] == "TXT" and b"SS-TUNNEL-OK" in rr.rdata.data:
@@ -90,14 +84,14 @@ def start_tunnel(dns_ip):
                 if is_valid or latency > 0:
                     log("OK", f"Latencia: {int(latency)}ms | Seq: {seq}")
                 else:
-                    log("FAIL", "Respuesta vacía o falsa")
+                    log("FAIL", "Respuesta vacía")
             
             seq += 1
-            time.sleep(1) # Estabilidad
+            time.sleep(1)
             
         except socket.timeout:
             log("FAIL", "Sin respuesta del servidor")
-            time.sleep(2)
+            time.sleep(1)
         except Exception as e:
             log("FAIL", str(e))
         finally:
@@ -119,3 +113,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+EOF
