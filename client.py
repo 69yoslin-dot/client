@@ -3,7 +3,7 @@ import time
 import sys
 import os
 import random
-from dnslib import DNSRecord, QTYPE
+from dnslib import DNSRecord, QTYPE, DNSQuestion  # Se agregó DNSQuestion aquí
 
 # ==========================================
 # CONFIGURACIÓN ACTUALIZADA
@@ -62,8 +62,11 @@ def start_tunnel(dns_ip):
             # Ejemplo: p1.5599.madaras.publicvm.com
             subdomain = f"p{seq}.{session_id}.{SERVER_DOMAIN}"
             
-            q = DNSRecord.q(subdomain)
-            pkt = q.pack()
+            # --- CORRECCIÓN DEL ERROR ---
+            q_record = DNSRecord()
+            q_record.add_question(DNSQuestion(subdomain, QTYPE.A))
+            pkt = q_record.pack()
+            # -----------------------------
             
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.settimeout(3) # Timeout rápido
