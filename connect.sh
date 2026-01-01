@@ -1,15 +1,16 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
 # ==================================================
-#  SS.MADARAS CLIENT - FREEZING DNS (Transparent Mode)
+#  SS.MADARAS CLIENT - FREEZING DNS (Premium Edition)
+#  Lógica de Conexión: Fidelidad Total Original
 # ==================================================
 
 # --- CONFIGURACIÓN DEL SERVIDOR ---
-# Dominio actualizado a madaras.publicvm.com
-DOMAIN="madaras.publicvm.com"
+DOMAIN="dns.madaras.work.gd"
 LOCAL_PORT="5201"
+BIN_URL="https://github.com/Mahboub-power-is-back/quic_over_dns/raw/main/slipstream-client"
 
-# --- LISTAS DE SERVIDORES (Lógica de Razihel) ---
+# --- LISTAS DE SERVIDORES (Tus datos guardados) ---
 DATA_SERVERS=(
 "200.55.128.130:53"
 "200.55.128.140:53"
@@ -52,6 +53,14 @@ banner() {
     echo -e "${PURPLE} ────────────────────────────────────────────${RESET}"
 }
 
+check_binary() {
+    if [ ! -f "./slipstream-client" ]; then
+        echo -e "${YELLOW}[!] Descargando Núcleo SS.MADARAS...${RESET}"
+        wget -q --show-progress "$BIN_URL" -O slipstream-client
+        chmod +x slipstream-client
+    fi
+}
+
 limpiar_procesos() {
     pkill -f slipstream-client > /dev/null 2>&1
 }
@@ -60,8 +69,9 @@ verificar_dns_muerto() {
     grep -qE "Connection closed|resolver timeout|no response" "$LOG_FILE"
 }
 
-# --- MOTOR DE CONEXIÓN (OPTIMIZADO PARA HANDSHAKE LENTO) ---
+# --- MOTOR DE CONEXIÓN (Lógica Razihel Modificada) ---
 conectar_auto() {
+    check_binary
     local SERVERS=("$@")
     
     while true; do
@@ -85,7 +95,7 @@ conectar_auto() {
             PID=$!
             SERVER_CONNECTED=false
 
-            # AUMENTO A 15 SEGUNDOS: Ideal para evitar el "Signal 15" prematuro
+            # Espera optimizada para redes lentas
             echo -e "${GREY}[LOG] Esperando handshake (Máx 15s)...${RESET}"
             for i in {1..15}; do
                 if grep -q "Connection confirmed" "$LOG_FILE"; then
