@@ -17,19 +17,18 @@ jobs:
 
       - name: Set up Android NDK
         run: |
-          # Descargamos el NDK oficial de Google (Versión estable r26b)
           wget https://dl.google.com/android/repository/android-ndk-r26b-linux.zip
           unzip -q android-ndk-r26b-linux.zip
-          # Guardamos la ruta para usarla después
           echo "NDK_PATH=$GITHUB_WORKSPACE/android-ndk-r26b" >> $GITHUB_ENV
 
       - name: Configure and Build
         run: |
-          # Configuramos los flags para que ignore los avisos de formato y no se detenga
-          export CFLAGS="-Wno-error -Wno-format-truncation -Wno-unused-command-line-argument"
-          export CXXFLAGS="-Wno-error -Wno-format-truncation -Wno-unused-command-line-argument"
+          # Seteamos variables de entorno que CMake y Meson leen obligatoriamente
+          export CFLAGS="-w -O3 -fPIC"
+          export CXXFLAGS="-w -O3 -fPIC"
+          export LDFLAGS="-Wl,-z,max-page-size=65536"
           
-          # Creamos el archivo de configuración cruzada para Android
+          # Creamos el archivo de configuración cruzada
           cat <<EOF > android-cross.txt
           [binaries]
           c = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang'
@@ -45,8 +44,8 @@ jobs:
           endian = 'little'
           EOF
 
-          # Ejecutamos Meson con nivel de advertencia bajo para evitar paradas innecesarias
-          meson setup build --cross-file android-cross.txt --buildtype=release -Ddefault_library=static --warnlevel=0
+          # Configuramos con -w (suprimir todos los warnings)
+          meson setup build --cross-file android-cross.txt --buildtype=release -Ddefault_library=static -Dc_args='-w' -Dcpp_args='-w'
           meson compile -C build
 
       - name: Upload Result
