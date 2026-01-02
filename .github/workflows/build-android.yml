@@ -1,4 +1,4 @@
-name: Build Android ARM64 PRO
+name: Build Android ARM64 Final
 on: [push, workflow_dispatch]
 
 jobs:
@@ -10,31 +10,33 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Set up NDK & Build
+      - name: Install System Tools
         run: |
-          sudo apt update && sudo apt install -y meson ninja-build pkg-config
-          
-          # 1. Obtener el NDK
+          sudo apt update
+          sudo apt install -y meson ninja-build pkg-config wget unzip cmake
+
+      - name: Set up Android NDK
+        run: |
           wget -q https://dl.google.com/android/repository/android-ndk-r26b-linux.zip
           unzip -q android-ndk-r26b-linux.zip
-          export NDK_PATH=$GITHUB_WORKSPACE/android-ndk-r26b
-          
-          # 2. Configurar el Toolchain oficial de Android
-          # Esto soluciona de golpe: OpenSSL, TLS Alignment (64 bytes) y Skew.
+          echo "NDK_PATH=$GITHUB_WORKSPACE/android-ndk-r26b" >> $GITHUB_ENV
+
+      - name: Configure and Build
+        run: |
+          # 1. Creamos el archivo cross-compile profesional
           cat <<EOF > android-cross.txt
           [binaries]
           c = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang'
           cpp = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang++'
           ar = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar'
           strip = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip'
-          pkg-config = 'pkg-config'
 
           [host_machine]
           system = 'android'
           cpu_family = 'aarch64'
           cpu = 'armv8-a'
           endian = 'little'
-          
+
           [built-in options]
           c_args = ['-w', '-DANDROID', '-fPIC']
           cpp_args = ['-w', '-DANDROID', '-fPIC']
@@ -42,12 +44,17 @@ jobs:
           cpp_link_args = ['-Wl,-z,max-page-size=65536']
           EOF
 
-          # 3. Compilar ignorando errores de warnings
-          meson setup build --cross-file android-cross.txt --buildtype=release -Ddefault_library=static
+          # 2. Forzamos a picoquic a usar el OpenSSL del sistema o deshabilitamos lo que cause conflicto
+          # Usamos un flag para que Meson no se detenga si falta una librería opcional
+          meson setup build --cross-file android-cross.txt --buildtype=release \
+          -Ddefault_library=static \
+          -Dwarning_level=0 \
+          -Dprefix=$GITHUB_WORKSPACE/out
+
           meson compile -C build
 
-      - name: Upload Artifact
+      - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
-          name: slipstream-android-fixed
+          name: slipstream-android-v1
           path: build/slipstream-client
