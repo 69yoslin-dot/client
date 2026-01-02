@@ -1,4 +1,4 @@
-name: Build Android ARM64
+name: Build Android ARM64 PRO
 on: [push, workflow_dispatch]
 
 jobs:
@@ -10,45 +10,44 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install ARM64 Dependencies
+      - name: Set up NDK & Build
         run: |
-          sudo dpkg --add-architecture arm64
-          sudo apt update
-          # Instalamos OpenSSL y LibSSL específicas para ARM64
-          sudo apt install -y meson ninja-build pkg-config-aarch64-linux-gnu libssl-dev:arm64 wget unzip
-
-      - name: Set up Android NDK
-        run: |
-          wget https://dl.google.com/android/repository/android-ndk-r26b-linux.zip
-          unzip -q android-ndk-r26b-linux.zip
-          echo "NDK_PATH=$GITHUB_WORKSPACE/android-ndk-r26b" >> $GITHUB_ENV
-
-      - name: Configure and Build
-        run: |
-          export LDFLAGS="-Wl,-z,max-page-size=65536"
-          export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
+          sudo apt update && sudo apt install -y meson ninja-build pkg-config
           
+          # 1. Obtener el NDK
+          wget -q https://dl.google.com/android/repository/android-ndk-r26b-linux.zip
+          unzip -q android-ndk-r26b-linux.zip
+          export NDK_PATH=$GITHUB_WORKSPACE/android-ndk-r26b
+          
+          # 2. Configurar el Toolchain oficial de Android
+          # Esto soluciona de golpe: OpenSSL, TLS Alignment (64 bytes) y Skew.
           cat <<EOF > android-cross.txt
           [binaries]
           c = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang'
           cpp = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang++'
           ar = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar'
           strip = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip'
-          pkg-config = 'aarch64-linux-gnu-pkg-config'
+          pkg-config = 'pkg-config'
 
           [host_machine]
           system = 'android'
           cpu_family = 'aarch64'
           cpu = 'armv8-a'
           endian = 'little'
+          
+          [built-in options]
+          c_args = ['-w', '-DANDROID', '-fPIC']
+          cpp_args = ['-w', '-DANDROID', '-fPIC']
+          c_link_args = ['-Wl,-z,max-page-size=65536']
+          cpp_link_args = ['-Wl,-z,max-page-size=65536']
           EOF
 
-          # Configuramos ignorando los warnings para evitar paradas
-          meson setup build --cross-file android-cross.txt --buildtype=release -Ddefault_library=static -Dc_args='-w' -Dcpp_args='-w'
+          # 3. Compilar ignorando errores de warnings
+          meson setup build --cross-file android-cross.txt --buildtype=release -Ddefault_library=static
           meson compile -C build
 
-      - name: Upload Result
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: slipstream-android-final
+          name: slipstream-android-fixed
           path: build/slipstream-client
