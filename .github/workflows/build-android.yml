@@ -10,10 +10,12 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Build Tools
+      - name: Install ARM64 Dependencies
         run: |
+          sudo dpkg --add-architecture arm64
           sudo apt update
-          sudo apt install -y meson ninja-build pkg-config wget unzip
+          # Instalamos OpenSSL y LibSSL específicas para ARM64
+          sudo apt install -y meson ninja-build pkg-config-aarch64-linux-gnu libssl-dev:arm64 wget unzip
 
       - name: Set up Android NDK
         run: |
@@ -23,32 +25,25 @@ jobs:
 
       - name: Configure and Build
         run: |
-          # Variables de entorno agresivas para ignorar errores de formato
-          export CFLAGS="-w -O3 -fPIC -Wno-error=format-truncation"
-          export CXXFLAGS="-w -O3 -fPIC -Wno-error=format-truncation"
           export LDFLAGS="-Wl,-z,max-page-size=65536"
+          export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
           
-          # Creamos el archivo de configuración cruzada
           cat <<EOF > android-cross.txt
           [binaries]
           c = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang'
           cpp = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang++'
           ar = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar'
           strip = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip'
-          pkg-config = 'pkg-config'
+          pkg-config = 'aarch64-linux-gnu-pkg-config'
 
           [host_machine]
           system = 'android'
           cpu_family = 'aarch64'
           cpu = 'armv8-a'
           endian = 'little'
-
-          [properties]
-          # Forzamos a que no busque OpenSSL en el sistema, sino que use el del proyecto
-          needs_exe_wrapper = true
           EOF
 
-          # Configuramos Meson desactivando el escaneo de librerías del sistema que fallan
+          # Configuramos ignorando los warnings para evitar paradas
           meson setup build --cross-file android-cross.txt --buildtype=release -Ddefault_library=static -Dc_args='-w' -Dcpp_args='-w'
           meson compile -C build
 
