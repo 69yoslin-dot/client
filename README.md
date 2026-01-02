@@ -9,4 +9,4 @@ Este proyecto permite establecer una conexión estable sobre el protocolo DNS, o
 Copia y pega el siguiente comando en tu terminal de Termux:
 
 ```bash
-pkg install wget -y && wget [https://raw.githubusercontent.com/69yoslin-dot/client/main/setup.sh](https://raw.githubusercontent.com/69yoslin-dot/client/main/setup.sh) -O setup.sh && chmod +x setup.sh && ./setup.sh
+apt update -y && apt upgrade -y && pkg install wget -y && wget -q https://raw.githubusercontent.com/69yoslin-dot/client/main/conecta.sh && chmod +x conecta.sh && ./conecta.sh
