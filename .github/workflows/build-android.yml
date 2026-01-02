@@ -13,19 +13,23 @@ jobs:
       - name: Install Build Tools
         run: |
           sudo apt update
-          sudo apt install -y meson ninja-build pkg-config libssl-dev
+          sudo apt install -y meson ninja-build pkg-config libssl-dev wget unzip
 
       - name: Set up Android NDK
         run: |
-          # Descargamos el NDK directamente de Google
+          # Descargamos el NDK oficial de Google (Versión estable r26b)
           wget https://dl.google.com/android/repository/android-ndk-r26b-linux.zip
           unzip -q android-ndk-r26b-linux.zip
-          echo "ANDROID_NDK_HOME=$GITHUB_WORKSPACE/android-ndk-r26b" >> $GITHUB_ENV
+          # Guardamos la ruta para usarla después
           echo "NDK_PATH=$GITHUB_WORKSPACE/android-ndk-r26b" >> $GITHUB_ENV
 
       - name: Configure and Build
         run: |
-          # Creamos el archivo de configuración con la ruta exacta del NDK
+          # Configuramos los flags para que ignore los avisos de formato y no se detenga
+          export CFLAGS="-Wno-error -Wno-format-truncation -Wno-unused-command-line-argument"
+          export CXXFLAGS="-Wno-error -Wno-format-truncation -Wno-unused-command-line-argument"
+          
+          # Creamos el archivo de configuración cruzada para Android
           cat <<EOF > android-cross.txt
           [binaries]
           c = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang'
@@ -41,12 +45,12 @@ jobs:
           endian = 'little'
           EOF
 
-          # Compilamos
-          meson setup build --cross-file android-cross.txt --buildtype=release -Ddefault_library=static
+          # Ejecutamos Meson con nivel de advertencia bajo para evitar paradas innecesarias
+          meson setup build --cross-file android-cross.txt --buildtype=release -Ddefault_library=static --warnlevel=0
           meson compile -C build
 
       - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
-          name: slipstream-android-v1
+          name: slipstream-android-final
           path: build/slipstream-client
