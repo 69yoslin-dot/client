@@ -1,8 +1,8 @@
-# ❄️ FREEZING DNS - SS.MADARAS ❄️
+# ❄️ FREEZING - SS.MADARAS ❄️
 
-> **Servicio de Túnel DNS de alto rendimiento para Cuba.**
+> **Túnel VPN de alto rendimiento.**
 
-Este proyecto permite establecer una conexión estable sobre el protocolo DNS, optimizado para redes con restricciones.
+Este proyecto permite establecer una conexión estable, optimizado para redes con restricciones.
 
 ## 🚀 Instalación Rápida (Termux)
 
