@@ -1,0 +1,49 @@
+name: Build Android ARM64
+on: [push, workflow_dispatch]
+
+jobs:
+  android-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Build Tools
+        run: |
+          sudo apt update
+          sudo apt install -y meson ninja-build pkg-config libssl-dev
+
+      - name: Set up Android NDK
+        uses: n0rt3n/setup-ndk@v1
+        with:
+          ndk-version: r26b
+
+      - name: Configure and Build
+        run: |
+          # Creamos un archivo de configuración para el NDK
+          cat <<EOF > android-cross.txt
+          [binaries]
+          c = 'aarch64-linux-android34-clang'
+          cpp = 'aarch64-linux-android34-clang++'
+          ar = 'aarch64-linux-android-ar'
+          strip = 'aarch64-linux-android-strip'
+          pkg-config = 'pkg-config'
+
+          [host_machine]
+          system = 'android'
+          cpu_family = 'aarch64'
+          cpu = 'armv8-a'
+          endian = 'little'
+          EOF
+
+          # Compilamos usando el NDK que garantiza alineación de 64 bytes
+          meson setup build --cross-file android-cross.txt --buildtype=release -Ddefault_library=static
+          meson compile -C build
+
+      - name: Upload Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: slipstream-android-v1
+          path: build/slipstream-client
