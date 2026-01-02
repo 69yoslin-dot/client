@@ -16,19 +16,22 @@ jobs:
           sudo apt install -y meson ninja-build pkg-config libssl-dev
 
       - name: Set up Android NDK
-        uses: n0rt3n/setup-ndk@v1
-        with:
-          ndk-version: r26b
+        run: |
+          # Descargamos el NDK directamente de Google
+          wget https://dl.google.com/android/repository/android-ndk-r26b-linux.zip
+          unzip -q android-ndk-r26b-linux.zip
+          echo "ANDROID_NDK_HOME=$GITHUB_WORKSPACE/android-ndk-r26b" >> $GITHUB_ENV
+          echo "NDK_PATH=$GITHUB_WORKSPACE/android-ndk-r26b" >> $GITHUB_ENV
 
       - name: Configure and Build
         run: |
-          # Creamos un archivo de configuración para el NDK
+          # Creamos el archivo de configuración con la ruta exacta del NDK
           cat <<EOF > android-cross.txt
           [binaries]
-          c = 'aarch64-linux-android34-clang'
-          cpp = 'aarch64-linux-android34-clang++'
-          ar = 'aarch64-linux-android-ar'
-          strip = 'aarch64-linux-android-strip'
+          c = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang'
+          cpp = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android34-clang++'
+          ar = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar'
+          strip = '$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip'
           pkg-config = 'pkg-config'
 
           [host_machine]
@@ -38,7 +41,7 @@ jobs:
           endian = 'little'
           EOF
 
-          # Compilamos usando el NDK que garantiza alineación de 64 bytes
+          # Compilamos
           meson setup build --cross-file android-cross.txt --buildtype=release -Ddefault_library=static
           meson compile -C build
 
